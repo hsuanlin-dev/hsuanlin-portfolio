@@ -1,0 +1,236 @@
+---
+title: "深入淺出 JavaScript Event Loop：熱炒店比喻，理解微任務與宏任務"
+description: "用熱炒店比喻理解 JavaScript Event Loop、微任務與宏任務的執行順序。"
+date: "2026-03-07"
+published: true
+tags: ["JavaScript", "Event Loop", "Frontend", "Node.js"]
+---
+
+# 深入淺出 JavaScript Event Loop：熱炒店比喻，理解微任務與宏任務
+
+## 👨‍🍳 深入淺出 JavaScript Event Loop：熱炒店比喻，理解微任務與宏任務
+
+### 為什麼網頁不會「凍結」？—— 同步與異步的權衡
+
+JavaScript 是單執行緒語言，意味著它在同一個時間點，執行棧（Call Stack）裡只能處理一件事，無法同時處理多個任務。為了避免遇到等待操作（如 API 請求、計時器）時卡住整個程式，JavaScript 引入了非同步機制。這些非同步任務會先交由瀏覽器或 Node.js 的底層處理，完成後再透過事件循環排隊回來執行。
+
+- **同步 (Sync)：** 程式碼像是在排隊領餐，前一個人沒拿到菜，後面的人就得乾等 。如果中間卡了一個耗時的網路請求，主線程就會被佔用，導致瀏覽器直接「凍結」 。
+- **異步 (Async)：** 為了解決卡頓問題，JavaScript 引入了非同步機制。耗時任務（如計時器、API 請求）會先交由底層環境處理，主程式則繼續往下跑，等任務完成後再排隊回來執行 。
+
+---
+
+### **瀏覽器的事件循環**
+
+在瀏覽器中，事件循環每一輪的執行順序為：
+
+1. 執行同步程式碼（Call Stack）-  主線任務
+2. 清空所有 Microtask queue
+3. 執行一個 Macrotask
+4. 重複循環
+
+---
+
+### **事件循環在 Node.js 與瀏覽器的差異**
+
+Node.js 是基於 libuv，和整個瀏覽器事件循環執行順序是一樣的，但是它有分成六個大週期，每個大週期裡面都會執行三個相對應的小循環(1→2→3)。
+
+1. **timers**：處理 `setTimeout` / `setInterval`
+2. **pending callbacks**：某些異步操作的回呼
+3. **idle, prepare**：內部使用
+4. **poll**：等待新的 I/O 事件
+5. **check**：執行 `setImmediate`
+6. **close callbacks**：像是 `socket.on('close')`
+
+Node.js小循環 ( 1.同步 → 2.微任務 → 3.宏任務 )
+
+- `process.nextTick`：Node.js 專有，**優先順序最高**
+- `Promise.then`：屬於 microtask，優先於 macrotask
+- `setImmediate`：只存在於 Node.js，在 check 階段執行
+
+---
+
+事件循環這套核心機制確保了主線任務不會被耗時的操作卡住，讓網頁能保持流暢與互動性 。為了更直觀地理解這套複雜的調度流程，可以將整個執行環境想像成一家****「熱炒店」****。
+
+### 廚房的三大核心角色
+
+這家店之所以能高效運轉，全靠這套嚴密的職分：
+
+- **主廚 (Call Stack)**：店內唯一的勞動力（單執行緒） 。他一次只能炒一道菜，且原則極其固執：只要工作檯上還有盤子（同步程式碼），他絕對不看排隊區一眼 。
+- **廚房助手 (Web APIs)**：負責處理耗時雜事，如倒數計時（`setTimeout`）或發送網路請求（`Fetch`） 。助手完成工作後，會將對應的「單據」送往排隊區 。
+- **領班-即事件循環 (Event Loop)**：靈魂調度員 。他不斷確認「主廚空了沒？」，一旦主廚手邊沒活，他就按順序從排隊區(QUEUE)搬任務進場 。
+
+### 用廚房SOP來比喻事件循環
+
+這套循環是不斷重複的（The Loop）：
+
+- **第一階段：主廚清空 (JS Code Sync)**
+主廚把手邊看得到的同步程式碼（普通的 `console.log`、計算）全部炒完。如果遇到 `setTimeout`，就丟給助手。
+- **第二階段：助手完成並排隊 (Async Completion)**
+助手把 3 秒數完了，或是網路資料抓到了，就把對應的任務（Callback）塞進 **一般區**。如果是 Promise 完成了，就塞進 **VIP 區**。
+- **第三階段：領班檢查 VIP (Event Loop Checking Microtasks)**
+主廚手空了。領班去 **VIP 區**。如果有 VIP，領班就一張一張搬給主廚，直到 **VIP 區完全清空**。
+- **第四階段：領班檢查一般區 (Event Loop Checking Macrotasks)**
+VIP 區清空後，領班去 **一般區** 搬「第一張」單子給主廚。
+- **重複運作：**
+主廚炒完那張單子後，領班**又會回到第三步**（先看有沒有新 VIP 產生），如此循環。
+
+```
+    【 1. 主廚：Call Stack 】         【 2. 廚房助手：Web APIs 】
+    +-----------------------+       +------------------------------+
+    |  正在炒的菜 (同步代碼)  | ----> |  ⏱ 倒數計時 (setTimeout)    |
+    |  -------------------  |        |  🌐 網路請求 (fetch / AJAX)  |
+    |  (疊盤子：後進先出)    |        |  🖱 事件監聽 (DOM Events)    |
+    +-----------+-----------+       +------------+-----------------+
+                |                                |
+    (4) 主廚忙完 (Call Stack 空)                  | (3) 任務完成時
+        領班才來搬菜                              |     把單據往下送
+                |                                v
+                |             +------------------------------------+
+                |             | 【 3. 領班：Event Loop 】 (轉圈圈)  |
+                |             |    規則：                          |
+                |             |    - 主廚一定要是空的               |
+                |             |    - 先清空 VIP 單                 |
+                |             |    - 再拿一張一般單                 |
+                |             +-----------------+------------------+
+                |                               |
+                +<------------------------------+
+                |      優先檢查 VIP 區，沒人才看一般區 (FIFO 順序)
+                |
+    +-----------+-----------+  +-----------------------------+
+    |  【 VIP 區 】          |  |  【 一般區 】               |
+    |  (Microtask Queue)    |   |  (Task/Macrotask Queue)     |
+    |  - Promise.then()     |   |  - setTimeout 的回呼        |
+    |  - async/await 接關   |   |  - 點擊事件的反應            |
+    +-----------------------+   +-----------------------------+
+    
+    
+```
+
+---
+
+### 排隊區的階級制度：**微任務與宏任務**
+
+並非所有的訂單都是平等的，領班搬單時有嚴格的優先順序：
+
+- **VIP 區-微任務 (Microtask Queue)**：
+    - **包含**： `Promise.then`, `queueMicrotask`, `MutationObserver`, `async/await` 接關任務 。
+    - ⮕ Node.js 中 `process.nextTick` 優先於所有微任務。
+    - **規則**：主廚一旦有空，領班會優先清空 **所有的** VIP 單子，直到一張不剩 。
+- **一般區-宏任務 (Macrotask Queue)**：
+    - **包含**： `setTimeout`, `setInterval`, `setImmediate` 的回呼、DOM 點擊事件反應 。
+    - **規則**：只有在 VIP 區清空後，領班才會去搬一般區的 **「第一張」** 單子，一次只取一張(因為宏任務裡面可能會有微任務的callback) 。
+
+---
+
+### 主廚的出餐順序實例
+
+```jsx
+console.log("A"); // 主廚直接炒
+
+setTimeout(() => {
+  console.log("B"); // 助手去計時，最後進「一般區」
+}, 0);
+
+Promise.resolve().then(() => {
+  console.log("C"); // 助手立刻完成，進「VIP 區」
+});
+
+console.log("D"); // 主廚接著炒
+```
+
+1. **炒 A 與 D**：同步任務，主廚直接出餐 。
+2. **處理 VIP**：主廚空了，領班搬運 VIP 區的 C，**炒 C** 。
+3. **處理一般區**：VIP 空了，領班搬運一般區的 B，**炒 B** 。
+
+**⮕ 最終出餐結果：`A -> D -> C -> B`** 。
+
+---
+
+### **nextTick vs Promise**
+
+```jsx
+process.nextTick(() => console.log('tick'));  // 最優先微任務
+Promise.resolve().then(() => console.log('promise')); // 微任務
+setTimeout(() => console.log('timeout'), 0);  // 宏任務
+console.log('sync');  // 同步程式碼優先執行
+```
+
+**⮕ 輸出結果：sysn → tick → promise → timeout**
+
+---
+
+### **async/await 與事件循環**
+
+```jsx
+async function foo() {
+  console.log('A');
+  
+  await Promise.resolve();
+  // await 以下的程式碼會被中斷，將後續邏輯作為 microtask 進入 queue。
+  console.log('B');
+}
+
+console.log('C');
+foo();
+console.log('D');
+```
+
+**⮕ 輸出結果：**`C → A → D → B`
+
+---
+
+## **requestAnimationFrame 在事件循環中的位置**
+
+requestAnimationFrame (rAF) 是 **瀏覽器** 提供的用於優化動畫效能的 API，它在事件循環中有特殊的位置，它本身不屬於微任務也不屬於宏任務：
+
+```
+瀏覽器每一幀的處理順序:
+1. 執行同步程式碼
+2. 執行所有 microtasks (Promise.then, queueMicrotask 等)
+**3. 執行 requestAnimationFrame 回調 ← 特殊時機點**，**使用者在看到動畫前就先處理完**
+4. 瀏覽器渲染 (layout, paint, composite)
+5. 執行一個 macrotask (setTimeout, setInterval 等)
+6. 返回步驟 1 開始下一輪循環
+```
+
+這使得 rAF 能在渲染前的最後時刻更新畫面，確保動畫計算結果能立即被渲染，不會延遲到下一幀。
+
+執行範例:
+
+```jsx
+console.log('script start');   
+
+setTimeout(() => {             
+  console.log('setTimeout 1');
+
+  Promise.resolve().then(() => {
+    console.log('microtask inside setTimeout 1');
+  });
+}, 0);
+
+Promise.resolve().then(() => {  
+  console.log('microtask 1');
+});
+
+Promise.resolve().then(() => {  
+  console.log('microtask 2');
+});
+
+setTimeout(() => {
+  console.log('setTimeout 2');
+}, 0);
+
+requestAnimationFrame(() => {
+  console.log('rAF callback');
+});
+
+console.log('script end');
+```
+
+1. 先執行同步任務：`script start` → `script end`
+2. 接著執行當前幀的所有微任務：`microtask 1` → `microtask 2`
+3. 然後執行 requestAnimationFrame 回調：`rAF callback`（在下一次重繪前）
+4. 瀏覽器進行渲染
+5. 最後執行宏任務：`setTimeout 1` → `microtask inside setTimeout 1`（注意這個微任務在 setTimeout 回調內，所以會立即執行）→ `setTimeout 2`
+
+**⮕ 輸出結果：**`script start` → `script end` → `microtask 1` → `microtask 2` → `rAF callback` → `setTimeout 1` → `microtask inside setTimeout 1` → `setTimeout 2`

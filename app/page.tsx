@@ -347,6 +347,8 @@ export default function Personal() {
 
 
       <motion.section
+        id="blog"
+        className="scroll-mt-32"
         variants={VARIANTS_SECTION}
         transition={TRANSITION_SECTION}
       >

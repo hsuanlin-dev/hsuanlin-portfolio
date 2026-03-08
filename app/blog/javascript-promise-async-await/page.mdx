@@ -1,0 +1,558 @@
+export const metadata = {
+  title: 'JavaScript 非同步深度解析：Promise、Async Await 與手寫 Promise',
+  description: '深入理解 JavaScript 非同步、Promise 與 Async/Await',
+}
+
+# JavaScript 非同步深度解析：Promise、Async/Await 與手寫 Promise.all 實作
+
+### 引言
+
+在現代前端開發中，非同步操作無處不在：API 請求、檔案讀取、計時器… 傳統的回調函式（Callback）雖然能解決問題，卻很容易陷入「回調地獄」，讓程式碼難以維護與除錯。
+
+**Promise** 的出現，正是為了讓非同步程式碼變得優雅、可讀且易於錯誤處理。而 **Async/Await** 更是建立在 Promise 之上的語法糖，讓非同步程式碼看起來就像同步一樣直觀。
+
+這篇文章將從基礎到進階，完整整理 Promise 的核心概念、狀態轉換、靜態方法，以及手動實作 `Promise.all()`。
+
+---
+
+### 一、Promise 是什麼？有什麼用途？
+
+**Promise** 是一個代表「未來會完成」的物件，用來處理非同步操作的結果。它有三種狀態，且一旦改變就不可逆：
+
+
+![image](/blog/js-promise/image.png)
+
+- **Pending（等待中）**：初始狀態，非同步操作進行中
+- **Fulfilled（已實現）**：操作成功完成，帶有結果值
+- **Rejected（已拒絕）**：操作失敗，帶有錯誤原因
+
+```jsx
+const promise = new Promise((resolve, reject) => {
+  // 執行非同步操作…
+  if (success) {
+    resolve(value);   // → Fulfilled
+  } else {
+    reject(error);    // → Rejected
+  }
+});
+```
+
+Promise 建構函式會接收一個 **executor**（執行器），裡面包含兩個參數 resolve 與 reject。
+
+---
+
+### 二、Promise 的狀態轉換規則（常考題）
+
+1. 初始狀態永遠是 **Pending**
+2. 只能從 Pending 轉變為 **Fulfilled** 或 **Rejected**
+3. **狀態轉變後不可逆**（一旦成功就不能失敗，反之亦然）
+4. 狀態改變時，會自動觸發對應的 `.then()` 或 `.catch()` 回調函式
+
+---
+
+### 三、為什麼需要 Promise？（解決回調地獄）
+
+傳統回調寫法容易產生巢狀地獄：
+
+```jsx
+doSomething(function(result) {
+  doSomethingElse(result, function(newResult) {
+    doThirdThing(newResult, function(finalResult) {
+      console.log(finalResult);
+    }, failureCallback);
+  }, failureCallback);
+}, failureCallback);
+```
+
+改用 Promise 後變得乾淨許多：
+
+```jsx
+doSomething()
+  .then(result => doSomethingElse(result))
+  .then(newResult => doThirdThing(newResult))
+  .then(finalResult => console.log(finalResult))
+  .catch(failureCallback);
+```
+
+Promise 解決了傳統回調函式的多個問題，提供了更優雅的非同步處理方式：
+
+- `避免回調地獄`：解決巢狀回調導致的程式碼難以維護問題
+- `統一錯誤處理`：使用 catch 方法統一處理錯誤
+- `鏈式調用`：通過 then 方法實現清晰的流程控制
+- `更好的語義化`：Promise 的狀態轉換更符合程式設計直覺
+
+---
+
+### 四、Async/Await —— 最接近同步的寫法
+
+`Async/Await` 是建立在 Promise 之上的語法糖，提供了更直觀的方式來處理非同步操作：
+
+- **同步風格：**使非同步程式碼看起來像同步程式碼
+- **錯誤處理：**可以使用傳統的 `try/catch` 處理錯誤
+- **除錯方便：**可以像同步程式碼一樣逐行除錯
+- **條件處理：**更容易實現複雜的條件判斷邏輯
+
+```jsx
+async function fetchUserData() {
+  try {
+    const response = await fetch('/api/user');
+    const userData = await response.json();
+    return userData;
+  } catch (error) {
+    console.error('發生錯誤', error);
+    throw error;
+  }
+}
+```
+
+### **async/await 和 Promise 的關係？**
+
+- `async/await` 是建立在 Promise 之上的語法糖
+- `async` 函式總是返回一個 Promise
+- `await` 只能在 async 函式內使用
+- `await` 可以等待任何有 `.then()` 方法的物件（thenable）
+
+```jsx
+// async 函式總是返回 Promise
+async function example() {
+  return "Hello";
+}
+
+// 等同於
+function example() {
+  return Promise.resolve("Hello");
+}
+
+// 驗證 async 返回的是 Promise
+console.log(example()); // Promise {<fulfilled>: "Hello"}
+
+// await 解開的是 Promise resolve 的值
+async function example() {
+  const result = await example(); // 等待 Promise.resolve("Hello") 的結果
+  console.log(result); // "Hello"
+  
+  // 等同於
+  example().then(value => console.log(value)); // "Hello"
+}
+
+// 完整範例比較
+// Promise 方式
+function fetchData() {
+  return fetch('/api/data')
+    .then(response => response.json())
+    .then(data => data)
+    .catch(error => console.error(error));
+}
+
+// async/await 方式 - 更易讀的同步風格
+async function fetchData() {
+  try {
+    const response = await fetch('/api/data');
+    const data = await response.json();
+    return data; // 自動被包裝為 Promise.resolve(data)
+  } catch (error) {
+    console.error(error);
+  }
+}
+```
+
+### **完整比較**：
+
+| 寫法 | 可讀性 | 錯誤處理 | 除錯方便度 |
+| --- | --- | --- | --- |
+| Callback | 差 | 多個 failureCallback | 困難 |
+| Promise | 中 | .catch() | 中等 |
+| Async/Await | 極佳 | try/catch | 最佳 |
+
+---
+
+### 五、Promise 靜態方法一次搞懂
+
+![image](/blog/js-promise/image-1.png)
+
+
+| 方法 | 用途 | 任一失敗時的行為 | 推薦場景 |
+| --- | --- | --- | --- |
+| **Promise.all()** | 並行執行多個 Promise，全部成功才成功 | 立即失敗 | 同時取得多筆資料（使用者+文章） |
+| **Promise.race()** | 最快完成的 Promise 勝出 | 誰快就用誰（成功或失敗） | 設定請求超時 |
+| **Promise.any()** | 第一個成功的 Promise 勝出 | 全部失敗才拒絕 | 多個備援 API |
+| **Promise.allSettled()** | 等待全部完成（不管成功失敗） | 永遠成功 | 需要知道每個請求結果 |
+
+**範例**：
+
+```jsx
+// 同時請求使用者與貼文
+Promise.all([
+  fetch('/api/users'),
+  fetch('/api/posts')
+]).then(([users, posts]) => { /* 處理 */ });
+
+// 設定 5 秒超時
+Promise.race([
+  fetch('/api/data'),
+  new Promise((_, rej) => setTimeout(() => rej('Timeout'), 5000))
+]);
+```
+
+---
+
+### 六、Promise.all 與 Promise.race 的差異（高頻）
+
+![image](/blog/js-promise/image-2.png)
+
+| 特性 | Promise.all | Promise.race |
+| --- | --- | --- |
+| 完成條件 | 所有 Promise 都完成 | 任一 Promise 完成即可 |
+| 失敗行為 | 任一失敗就整體失敗 | 最快完成的結果（無論成功失敗） |
+| 返回值 | 所有結果組成的陣列 | 第一個完成的單一結果 |
+
+---
+
+### 七、手動實作 Promise.all（oo加分題）
+
+```jsx
+function promiseAll(promises) {
+  return new Promise((resolve, reject) => {
+    const result = [];
+    let finished = 0;
+
+    for (let i = 0; i < promises.length; i++) {
+      Promise.resolve(promises[i])
+        .then(value => {
+          result[i] = value;
+          finished++;
+          if (finished === promises.length) {
+            resolve(result);
+          }
+        })
+        .catch(reject);   // 任一失敗就 reject
+    }
+  });
+}
+```
+
+- 程式講解
+    
+    ## 1️⃣ 整體概念（先理解這個）
+    
+    其實整個邏輯只有：
+    
+    ```
+    同時跑所有 Promise
+          │
+          ▼
+    每完成一個就存結果
+          │
+          ▼
+    全部完成 → resolve
+    任何錯誤 → reject
+    ```
+    
+    ASCII：
+    
+    ```
+    p1 ─┐
+    p2 ─┼──► 收集結果
+    p3 ─┘
+    
+    全部完成
+       │
+       ▼
+    resolve([v1,v2,v3])
+    ```
+    
+    ---
+    
+    ## 2️⃣ 執行流程
+    
+    假設：
+    
+    ```jsx
+    promiseAll([p1,p2,p3])
+    ```
+    
+    ---
+    
+    ### Step 1 建立 Promise
+    
+    ```
+    promiseAll()
+        │
+        ▼
+    new Promise
+    ```
+    
+    ---
+    
+    ### Step 2 建立結果陣列
+    
+    ```
+    constresult= []
+    letfinished=0
+    ```
+    
+    狀態：
+    
+    ```
+    result = []
+    finished = 0
+    ```
+    
+    ---
+    
+    ### Step 3 for loop 執行 Promise
+    
+    ```
+    for (leti=0;i<promises.length;i++)
+    ```
+    
+    ASCII：
+    
+    ```
+    i=0 → p1
+    i=1 → p2
+    i=2 → p3
+    ```
+    
+    三個 Promise **同時開始跑**
+    
+    ---
+    
+    ## 3️⃣ Promise 完成時
+    
+    假設完成順序：
+    
+    ```
+    p2 → p3 → p1
+    ```
+    
+    流程：
+    
+    ```
+    p2 完成
+    result = [ , v2 , ]
+    finished = 1
+    ```
+    
+    ```
+    p3 完成
+    result = [ , v2 , v3 ]
+    finished = 2
+    ```
+    
+    ```
+    p1 完成
+    result = [ v1 , v2 , v3 ]
+    finished = 3
+    ```
+    
+    ---
+    
+    ## 4️⃣ 全部完成
+    
+    這行：
+    
+    ```jsx
+    if (finished === promises.length)
+    ```
+    
+    ASCII：
+    
+    ```
+    finished = 3
+    length = 3
+    ```
+    
+    ```
+    全部完成
+       │
+       ▼
+    resolve(result)
+    ```
+    
+    輸出：
+    
+    ```jsx
+    [v1,v2,v3]
+    ```
+    
+    ---
+    
+    ## 5️⃣ 如果有錯誤
+    
+    這行：
+    
+    ```
+    },reject);
+    ```
+    
+    等同於：
+    
+    ```
+    .then(success, reject)
+    ```
+    
+    如果有一個 Promise：
+    
+    ```
+    reject(error)
+    ```
+    
+    流程：
+    
+    ```
+    p2 reject
+       │
+       ▼
+    reject(error)
+    ```
+    
+    整個 `promiseAll` 結束。
+    
+    ---
+    
+    ## 6️⃣ 為什麼要用 Promise.resolve()
+    
+    這行：
+    
+    ```
+    Promise.resolve(promises[i])
+    ```
+    
+    可以支援這種情況：
+    
+    ```
+    Promise.all([1,Promise.resolve(2),3])
+    ```
+    
+    ASCII：
+    
+    ```
+    輸入
+    [1, Promise, 3]
+    
+    轉換
+    
+    1 → Promise(1)
+    3 → Promise(3)
+    ```
+    
+    所以全部可以統一 `.then()`。
+    
+    ---
+    
+    ## 7️⃣ 完整 ASCII 流程圖
+    
+    ```
+    				 promiseAll([p1,p2,p3])
+    				         │
+    				         ▼
+    				     new Promise
+    				         │
+    				         ▼
+    				     result = []
+    				     finished = 0
+    				         │
+    				         ▼
+    				      for loop
+    				         │
+      ┌──────────────┼──────────────┐
+      ▼              ▼              ▼
+     p1              p2             p3
+     │               │              │
+    resolve       resolve        resolve
+     │               │              │ 
+     ▼               ▼              ▼
+    [ v1 , , ]   [ v1,v2, ]    [ v1,v2,v3 ]
+    finished=1   finished=2    finished=3
+                                    │
+                                    ▼
+                             resolve(result)
+    ```
+    
+    ---
+    
+    ## ⭐ oo官最想聽到的一句話
+    
+    如果oo官問你：
+    
+    > `Promise.all` 怎麼實作？
+    > 
+    
+    最標準回答：
+    
+    ```
+    1 同時執行所有 promise
+    2 用 counter 記錄完成數量
+    3 全部完成 resolve
+    4 任何錯誤 reject
+    ```
+    
+
+```jsx
+function promiseAll(promises) {
+  // 回傳一個新的 Promise（模擬 Promise.all 的行為）
+  return new Promise((resolve, reject) => {
+
+    const result = [];   // 用來存放每個 promise 成功後的結果
+    let finished = 0;    // 記錄已經完成的 promise 數量
+
+    // 逐一處理每個 promise
+    for (let i = 0; i < promises.length; i++) {
+
+      // Promise.resolve 可以確保每個值都是 Promise
+      // (就算傳入普通值也會轉成 Promise)
+      Promise.resolve(promises[i])
+
+        .then(value => {
+          // 當某個 promise 成功時，把結果存到對應位置
+          // 使用 i 可以保持原本的順序
+          result[i] = value;
+
+          // 完成數量 +1
+          finished++;
+
+          // 如果所有 promise 都完成
+          if (finished === promises.length) {
+            // 回傳所有結果
+            resolve(result);
+          }
+        })
+
+        // 只要任何一個 promise 失敗
+        // 整個 promiseAll 就直接 reject
+        .catch(reject);
+    }
+  });
+}
+```
+
+這個實作展示了 Promise 的核心原理：狀態管理、計數完成數量、錯誤處理。
+
+[Promise.all 是什麼？請實現 Promise.all｜ExplainThis](https://www.explainthis.io/zh-hant/swe/javascript-whiteboard-promise-all)
+
+---
+
+### 結語
+
+從回調地獄到 Promise，再到 Async/Await，JavaScript 的非同步處理已經越來越人性化。熟練這些工具，不僅能讓你的程式碼更優雅。
+
+---
+
+`Promise.all()`  並行執行多個 Promise，等待全部完成。如果任一 Promise 失敗，整個操作就失敗。
+
+[JavaScript Promise.all(): Aggregate Results from Multiple Promises](https://www.javascripttutorial.net/javascript-promise-all/)
+
+`Promise.race`  返回最先完成的 Promise 結果，無論成功或失敗。
+
+[Learn JavaScript Promise.race() By Practical Examples](https://www.javascripttutorial.net/javascript-promise-race/)
+
+`Promise.any` 返回第一個**成功**的 Promise 結果，只有全部失敗時才會拒絕。
+
+[JavaScript Promise.any](https://www.javascripttutorial.net/javascript-promise-any/)
+
+`Promise.allSettled()`  等待所有 Promise 完成，返回每個 Promise 的結果狀態。
+
+[JavaScript Promise.allSettled() Method](https://www.javascripttutorial.net/javascript-promise-allsettled/)
+
+---

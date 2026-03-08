@@ -168,20 +168,20 @@ export const BLOG_POSTS: BlogPost[] = [
     title: 'Why I left my job to start my own company',
     description:
       'A deep dive into my decision to leave my job and start my own company',
-    link: '/blog/exploring-the-intersection-of-design-ai-and-design-engineering',
+    link: '/blog/test-post-my-first-custom-article',
     uid: 'blog-2',
   },
   {
-    title: 'What I learned from my first year of freelancing',
+    title: '深入淺出 JavaScript Event Loop：熱炒店比喻，理解微任務與宏任務',
     description:
-      'A look back at my first year of freelancing and what I learned',
-    link: '/blog/exploring-the-intersection-of-design-ai-and-design-engineering',
+      '用熱炒店比喻理解 JavaScript Event Loop、微任務與宏任務的執行順序。',
+    link: '/blog/javascript-event-loop-explained',
     uid: 'blog-3',
   },
   {
-    title: 'How to Export Metadata from MDX for Next.js SEO',
-    description: 'A guide on exporting metadata from MDX files to leverage Next.js SEO features.',
-    link: '/blog/example-mdx-metadata',
+    title: 'JavaScript 非同步深度解析：Promise、Async/Await 與手寫 Promise.all 實作',
+    description: '深入理解 JavaScript 非同步、Promise 與 Async/Await',
+    link: '/blog/javascript-promise-async-await',
     uid: 'blog-4',
   },
 ]
