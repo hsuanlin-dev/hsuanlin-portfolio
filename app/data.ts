@@ -73,7 +73,8 @@ export const PROJECTS: Project[] = [
       en: 'Advanced component library and customizable templates for sustainable ESG web platforms.',
       zh: '為永續 ESG 網站平台打造進階元件庫與可客製化版型系統。',
     },
-    link: 'https://csp-tradevan.com.tw/ESG/Formosa',
+    // link: 'https://csp-tradevan.com.tw/ESG/Formosa',
+    link: '/project/test-post-my-first-project-article',
     image: '/esg.png',
     id: 'project1',
   },
@@ -278,30 +279,30 @@ export const BLOG_POSTS: BlogPost[] = [
     link: '/blog/test-post-my-first-custom-article',
     uid: 'blog-5',
   },
-  {
-    title: {
-      en: 'Understanding JavaScript Variable Declarations: A Complete Guide to var, let, const, Hoisting, and the TDZ',
-      zh: '深入淺出 JavaScript 變數宣告：var、let、const、Hoisting 與 TDZ 完全解析',
-    },
-    description: {
-      en: 'Explore how var, let, const, hoisting, and the TDZ shape JavaScript variable behavior.',
-      zh: '解析 var、let、const、Hoisting 與 TDZ，理解 JavaScript 變數宣告的核心機制。',
-    },
-    link: '/blog/test-post-my-first-custom-article',
-    uid: 'blog-6',
-  },
-  {
-    title: {
-      en: 'JavaScript Shallow Copy vs Deep Copy: Understanding Memory References Through the “Safe Box” Analogy',
-      zh: 'JavaScript 淺拷貝與深拷貝：以「保險箱」比喻理解記憶體引用機制',
-    },
-    description: {
-      en: 'Understand shallow copy, deep copy, and memory references in JavaScript using the “safe box” analogy.',
-      zh: '透過「保險箱」比喻理解 JavaScript 的淺拷貝、深拷貝與記憶體引用機制。',
-    },
-    link: '/blog/test-post-my-first-custom-article',
-    uid: 'blog-7',
-  },
+  // {
+  //   title: {
+  //     en: 'Understanding JavaScript Variable Declarations: A Complete Guide to var, let, const, Hoisting, and the TDZ',
+  //     zh: '深入淺出 JavaScript 變數宣告：var、let、const、Hoisting 與 TDZ 完全解析',
+  //   },
+  //   description: {
+  //     en: 'Explore how var, let, const, hoisting, and the TDZ shape JavaScript variable behavior.',
+  //     zh: '解析 var、let、const、Hoisting 與 TDZ，理解 JavaScript 變數宣告的核心機制。',
+  //   },
+  //   link: '/blog/test-post-my-first-custom-article',
+  //   uid: 'blog-6',
+  // },
+  // {
+  //   title: {
+  //     en: 'JavaScript Shallow Copy vs Deep Copy: Understanding Memory References Through the “Safe Box” Analogy',
+  //     zh: 'JavaScript 淺拷貝與深拷貝：以「保險箱」比喻理解記憶體引用機制',
+  //   },
+  //   description: {
+  //     en: 'Understand shallow copy, deep copy, and memory references in JavaScript using the “safe box” analogy.',
+  //     zh: '透過「保險箱」比喻理解 JavaScript 的淺拷貝、深拷貝與記憶體引用機制。',
+  //   },
+  //   link: '/blog/test-post-my-first-custom-article',
+  //   uid: 'blog-7',
+  // },
 ]
 
 export const SOCIAL_LINKS: SocialLink[] = [

@@ -1,0 +1,87 @@
+export const metadata = {
+  title: 'Test Post: My First Project Article',
+  description:
+    'This is a test article used to verify that the blog template, MDX routing, and metadata are working correctly.',
+  alternates: {
+    canonical: '/blog/test-post-my-first-custom-article',
+  },
+};
+
+<Cover
+  src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1600&q=80"
+  alt="Laptop, notebook, and coffee on a desk"
+  caption="Test cover image"
+/>
+
+# Test Post: My First Custom Article
+
+This is a **test article** to make sure your blog template is working correctly.
+
+If this page renders normally, it means:
+
+- the MDX file is being loaded correctly
+- the blog route is working
+- the metadata is being applied
+- headings, lists, quotes, and links can all render properly
+
+---
+
+## Why I made this test post
+
+Before adding all seven of your real articles, it helps to verify that one sample post can:
+
+- appear in the blog page
+- open with the correct URL
+- display the cover image
+- render all markdown content without errors
+
+This helps you avoid repeating the same formatting issue seven times.
+
+## What to check on the page
+
+When you open this article locally, confirm the following:
+
+1. The page loads without a compile error.
+2. The title shows correctly.
+3. The cover image appears.
+4. The content sections render in order.
+5. The URL matches the folder name.
+
+> If this article works, you can duplicate the same structure for your other posts.
+
+---
+
+## Example content block
+
+Here is a simple section you can later replace with your real writing:
+
+Design, AI, and engineering increasingly overlap in modern product development. A strong blog template makes it easier to publish ideas consistently and keep your portfolio updated.
+
+### Example bullet points
+
+- Write in plain Markdown or MDX
+- Keep one article per folder
+- Name the folder with a clean slug
+- Update metadata for each post
+
+### Example link
+
+You can also include links like [my portfolio homepage](/).
+
+---
+
+## Next step after testing
+
+Once this page works, create more folders under `app/blog/` such as:
+
+- `app/blog/post-2/page.mdx`
+- `app/blog/post-3/page.mdx`
+- `app/blog/post-4/page.mdx`
+
+Then replace the title, description, canonical path, cover image, and body content for each article.
+
+---
+
+## Conclusion
+
+This test post is only for checking whether your current template works. After verification, you can use this file as the base for all your future articles.

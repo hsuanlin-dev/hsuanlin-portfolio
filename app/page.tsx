@@ -219,6 +219,8 @@ export default function Personal() {
       </motion.section>
       
       <motion.section
+        id="projects"
+        className="scroll-mt-32"
         variants={VARIANTS_SECTION}
         transition={TRANSITION_SECTION}
       >
@@ -234,7 +236,6 @@ export default function Personal() {
                 <a
                   className="font-base group relative inline-block font-[450] text-zinc-900 dark:text-zinc-50"
                   href={project.link}
-                  target="_blank"
                 >
                   {project.name}
                   <span className="absolute bottom-0.5 left-0 block h-[1px] w-full max-w-0 bg-zinc-900 dark:bg-zinc-50 transition-all duration-200 group-hover:max-w-full"></span>
