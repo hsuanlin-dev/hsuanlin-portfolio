@@ -220,30 +220,6 @@ export const EDUCATION: Education[] = [
 export const BLOG_POSTS: BlogPost[] = [
   {
     title: {
-      en: 'Exploring the Intersection of Design, AI, and Design Engineering',
-      zh: '探索設計、AI 與設計工程的交會',
-    },
-    description: {
-      en: 'How AI is changing the way we design',
-      zh: 'AI 正如何改變我們設計與打造產品的方式',
-    },
-    link: '/blog/exploring-the-intersection-of-design-ai-and-design-engineering',
-    uid: 'blog-1',
-  },
-  {
-    title: {
-      en: 'Test Post: My First Custom Article',
-      zh: '測試文章',
-    },
-    description: {
-      en: 'This is a test article used to verify that the blog template, MDX routing, and metadata are working correctly.',
-      zh: '測試文章描述',
-    },
-    link: '/blog/test-post-my-first-custom-article',
-    uid: 'blog-2',
-  },
-  {
-    title: {
       en: 'JavaScript Event Loop Explained: Understanding Microtasks and Macrotasks with a Stir-Fry Restaurant Analogy',
       zh: '深入淺出 JavaScript Event Loop：熱炒店比喻，理解微任務與宏任務',
     },
@@ -252,7 +228,7 @@ export const BLOG_POSTS: BlogPost[] = [
       zh: '用熱炒店比喻理解 JavaScript Event Loop、微任務與宏任務的執行順序。',
     },
     link: '/blog/javascript-event-loop-explained',
-    uid: 'blog-3',
+    uid: 'blog-1',
   },
   {
     title: {
@@ -264,7 +240,67 @@ export const BLOG_POSTS: BlogPost[] = [
       zh: '深入理解 JavaScript 非同步、Promise 與 Async/Await。',
     },
     link: '/blog/javascript-promise-async-await',
+    uid: 'blog-2',
+  },
+  {
+    title: {
+      en: 'JavaScript Closures: From the Explorer’s Backpack Analogy to Real-World Applications',
+      zh: 'JavaScript 閉包 (Closure)：從探險家背包比喻到實際應用',
+    },
+    description: {
+      en: 'Understand JavaScript closures through the “explorer’s backpack” analogy and learn how scope persistence works in practice.',
+      zh: '用「探險家背包」比喻理解 JavaScript Closure，學會作用域保存與實際開發應用。',
+    },
+    link: '/blog/test-post-my-first-custom-article',
+    uid: 'blog-3',
+  },
+  {
+    title: {
+      en: 'JavaScript Prototype System and ES6 Classes: From “Finding Dad’s Treasure Chest” to Understanding the Syntax Sugar',
+      zh: 'JavaScript 原型系統與 ES6 Class：從「找爸爸翻寶箱」到語法糖完整解析',
+    },
+    description: {
+      en: 'Understand JavaScript closures through the “explorer’s backpack” analogy and learn how scope persistence works in practice.',
+      zh: '透過「找爸爸翻寶箱」的比喻理解 JavaScript Prototype Chain 與 ES6 Class 的運作原理。',
+    },
+    link: '/blog/test-post-my-first-custom-article',
     uid: 'blog-4',
+  },
+  {
+    title: {
+      en: 'The JavaScript this Keyword Fully Explained: The 5 Binding Rules and Practical Use Cases',
+      zh: 'JavaScript this 關鍵字徹底解析：5 大綁定規則與實際應用',
+    },
+    description: {
+      en: 'Understand how the JavaScript this keyword works through the five binding rules and practical examples.',
+      zh: '透過五大綁定規則與實例解析 JavaScript this 的指向與實際應用。',
+    },
+    link: '/blog/test-post-my-first-custom-article',
+    uid: 'blog-5',
+  },
+  {
+    title: {
+      en: 'Understanding JavaScript Variable Declarations: A Complete Guide to var, let, const, Hoisting, and the TDZ',
+      zh: '深入淺出 JavaScript 變數宣告：var、let、const、Hoisting 與 TDZ 完全解析',
+    },
+    description: {
+      en: 'Explore how var, let, const, hoisting, and the TDZ shape JavaScript variable behavior.',
+      zh: '解析 var、let、const、Hoisting 與 TDZ，理解 JavaScript 變數宣告的核心機制。',
+    },
+    link: '/blog/test-post-my-first-custom-article',
+    uid: 'blog-6',
+  },
+  {
+    title: {
+      en: 'JavaScript Shallow Copy vs Deep Copy: Understanding Memory References Through the “Safe Box” Analogy',
+      zh: 'JavaScript 淺拷貝與深拷貝：以「保險箱」比喻理解記憶體引用機制',
+    },
+    description: {
+      en: 'Understand shallow copy, deep copy, and memory references in JavaScript using the “safe box” analogy.',
+      zh: '透過「保險箱」比喻理解 JavaScript 的淺拷貝、深拷貝與記憶體引用機制。',
+    },
+    link: '/blog/test-post-my-first-custom-article',
+    uid: 'blog-7',
   },
 ]
 
