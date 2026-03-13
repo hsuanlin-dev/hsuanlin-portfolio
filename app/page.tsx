@@ -12,6 +12,8 @@ import { Magnetic } from '@/components/ui/magnetic'
 // } from '@/components/ui/morphing-dialog'
 import Link from 'next/link'
 import { AnimatedBackground } from '@/components/ui/animated-background'
+import { useEffect, useState } from 'react'
+import { text } from '@/lib/i18n'
 import {
   SKILLS,
   PROJECTS,
@@ -142,6 +144,31 @@ function MagneticSocialLink({
 }
 
 export default function Personal() {
+
+  // language Change
+  const [lang, setLang] = useState<'en' | 'zh'>('en')
+  //console.log("lang:", lang)
+
+  useEffect(() => {
+    const savedLang = localStorage.getItem('lang') as 'en' | 'zh' | null
+    if (savedLang) {
+      setLang(savedLang)
+    }
+
+    const handleLanguageChange = () => {
+      const updatedLang = localStorage.getItem('lang') as 'en' | 'zh' | null
+      if (updatedLang) {
+        setLang(updatedLang)
+      }
+    }
+
+    window.addEventListener('languageChange', handleLanguageChange)
+
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange)
+    }
+  }, [])
+
   return (
     <motion.main
       className="space-y-24"
@@ -155,9 +182,9 @@ export default function Personal() {
       >
         <div className="flex-1">
           <p className="text-zinc-600 dark:text-zinc-400">
-            Senior Frontend Design Engineer<br></br>
-            5+ years crafting performant, interactive web experiences.<br></br>
-            Passionate about turning design intuition into clean, scalable code — delivering intuitive, fast, and accessible user interfaces.
+            {text[lang].heroTitle}<br></br>
+            {text[lang].heroSubtitle}<br></br>
+            {text[lang].heroDescription}
           </p>
         </div>
       </motion.section>
@@ -167,7 +194,7 @@ export default function Personal() {
         transition={TRANSITION_SECTION}
       >
         <h3 className="mb-6 text-xl font-semibold tracking-tight">
-          Skills
+          {text[lang].skills}
         </h3>
 
         <div className="flex flex-wrap gap-2">
@@ -195,7 +222,7 @@ export default function Personal() {
         variants={VARIANTS_SECTION}
         transition={TRANSITION_SECTION}
       >
-        <h3 className="mb-5 text-lg font-medium">Selected Projects</h3>
+        <h3 className="mb-5 text-lg font-medium">{text[lang].projects}</h3>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {PROJECTS.map((project) => (
             <div key={project.name} className="space-y-2">
@@ -213,7 +240,7 @@ export default function Personal() {
                   <span className="absolute bottom-0.5 left-0 block h-[1px] w-full max-w-0 bg-zinc-900 dark:bg-zinc-50 transition-all duration-200 group-hover:max-w-full"></span>
                 </a>
                 <p className="text-base text-zinc-600 dark:text-zinc-400">
-                  {project.description}
+                  {project.description[lang]}
                 </p>
               </div>
             </div>
@@ -222,7 +249,7 @@ export default function Personal() {
       </motion.section>
 
       <motion.section variants={VARIANTS_SECTION} transition={TRANSITION_SECTION}>
-        <h3 className="mb-5 text-lg font-medium">Work Experience</h3>
+        <h3 className="mb-5 text-lg font-medium">{text[lang].experience}</h3>
 
         <div className="flex flex-col space-y-3">
           {WORK_EXPERIENCE.map((job) => (
@@ -261,7 +288,7 @@ export default function Personal() {
                         <div key={idx}>
                           <div className="flex items-start justify-between gap-4">
                             <h5 className="text-base font-normal text-zinc-600 dark:text-zinc-400">
-                              {role.title}
+                              {role.title[lang]}
                             </h5>
                             <p className="shrink-0 text-base text-zinc-500 leading-relaxed dark:text-zinc-400">
                               {role.start} – {role.end}
@@ -269,7 +296,7 @@ export default function Personal() {
                           </div>
 
                           <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-zinc-600 dark:text-zinc-400">
-                            {role.highlights.map((item, i) => (
+                            {role.highlights[lang].map((item, i) => (
                               <li key={i}>{item}</li>
                             ))}
                           </ul>
@@ -285,7 +312,7 @@ export default function Personal() {
       </motion.section>
 
       <motion.section variants={VARIANTS_SECTION} transition={TRANSITION_SECTION}>
-        <h3 className="mb-5 text-lg font-medium">Education</h3>
+        <h3 className="mb-5 text-lg font-medium">{text[lang].education}</h3>
 
         <div className="flex flex-col space-y-3">
           {EDUCATION.map((school) => (
@@ -322,20 +349,21 @@ export default function Personal() {
                     <div className="mt-4">
                       <div className="flex items-start justify-between gap-4">
                         <p className="text-base font-normal text-zinc-600 dark:text-zinc-400">
-                          {school.title}
+                          {school.title[lang]}
                         </p>
                         <p className="shrink-0 text-base text-zinc-500 leading-relaxed dark:text-zinc-400">
                           {school.start} – {school.end}
                         </p>
                       </div>
 
-                      {school.highlights && school.highlights.length > 0 && (
+                      {school.highlights && school.highlights[lang].length > 0 && (
                         <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-zinc-600 dark:text-zinc-400">
-                          {school.highlights.map((item, idx) => (
-                            <li key={idx}>{item}</li>
+                          {school.highlights[lang].map((item) => (
+                            <li key={item}>{item}</li>
                           ))}
                         </ul>
                       )}
+                      
                     </div>
                   </div>
                 </div>
@@ -352,7 +380,7 @@ export default function Personal() {
         variants={VARIANTS_SECTION}
         transition={TRANSITION_SECTION}
       >
-        <h3 className="mb-3 text-lg font-medium">Blog</h3>
+        <h3 className="mb-3 text-lg font-medium">{text[lang].blog}</h3>
         <div className="flex flex-col space-y-0">
           <AnimatedBackground
             enableHover
@@ -372,10 +400,10 @@ export default function Personal() {
               >
                 <div className="flex flex-col space-y-1">
                   <h4 className="font-normal dark:text-zinc-100">
-                    {post.title}
+                    {post.title[lang]}
                   </h4>
                   <p className="text-zinc-500 dark:text-zinc-400">
-                    {post.description}
+                    {post.description[lang]}
                   </p>
                 </div>
               </Link>
@@ -388,17 +416,17 @@ export default function Personal() {
         variants={VARIANTS_SECTION}
         transition={TRANSITION_SECTION}
       >
-        <h3 className="mb-5 text-lg font-medium">Connect</h3>
+        <h3 className="mb-5 text-lg font-medium">{text[lang].connect}</h3>
         <p className="mb-5 text-zinc-600 dark:text-zinc-400">
-          Feel free to contact me at{' '}
+          {text[lang].contactIntro}{' '}
           <a className="underline dark:text-zinc-300" href={`mailto:${EMAIL}`}>
             {EMAIL}
           </a>
         </p>
         <div className="flex items-center justify-start space-x-3">
           {SOCIAL_LINKS.map((link) => (
-            <MagneticSocialLink key={link.label} link={link.link}>
-              {link.label}
+            <MagneticSocialLink key={link.link} link={link.link}>
+              {link.label[lang]}
             </MagneticSocialLink>
           ))}
         </div>
