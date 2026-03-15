@@ -1,0 +1,23 @@
+
+---
+title: JavaScript 原型系統
+description: 原型系統文章的暫時內容。
+---
+
+# JavaScript 原型系統
+
+這是一篇 **測試用文章**，之後會再補上完整解說。
+
+## 範例
+
+```javascript
+function Person(name) {
+  this.name = name
+}
+
+Person.prototype.sayHello = function () {
+  console.log("Hello " + this.name)
+}
+
+const user = new Person("Alex")
+user.sayHello()

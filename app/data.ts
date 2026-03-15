@@ -252,7 +252,7 @@ export const BLOG_POSTS: BlogPost[] = [
       en: 'Understand JavaScript closures through the “explorer’s backpack” analogy and learn how scope persistence works in practice.',
       zh: '用「探險家背包」比喻理解 JavaScript Closure，學會作用域保存與實際開發應用。',
     },
-    link: '/blog/test-post-my-first-custom-article',
+    link: '/blog/javascript-closures',
     uid: 'blog-3',
   },
   {
@@ -264,7 +264,7 @@ export const BLOG_POSTS: BlogPost[] = [
       en: 'Understand JavaScript closures through the “explorer’s backpack” analogy and learn how scope persistence works in practice.',
       zh: '透過「找爸爸翻寶箱」的比喻理解 JavaScript Prototype Chain 與 ES6 Class 的運作原理。',
     },
-    link: '/blog/test-post-my-first-custom-article',
+    link: '/blog/javascript-prototype-system',
     uid: 'blog-4',
   },
   {
@@ -276,7 +276,7 @@ export const BLOG_POSTS: BlogPost[] = [
       en: 'Understand how the JavaScript this keyword works through the five binding rules and practical examples.',
       zh: '透過五大綁定規則與實例解析 JavaScript this 的指向與實際應用。',
     },
-    link: '/blog/test-post-my-first-custom-article',
+    link: '/blog/javascript-this-keyword',
     uid: 'blog-5',
   },
   // {

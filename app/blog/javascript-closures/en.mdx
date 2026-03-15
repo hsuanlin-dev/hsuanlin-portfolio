@@ -1,0 +1,26 @@
+---
+title: JavaScript Closures
+description: Simple placeholder article for testing routing and links.
+---
+
+# JavaScript Closures
+
+This is a **temporary placeholder article** for the JavaScript Closures topic.
+
+The real content will be added later.
+
+## Example
+
+```javascript
+function outer() {
+  let count = 0
+
+  return function inner() {
+    count++
+    console.log(count)
+  }
+}
+
+const counter = outer()
+counter()
+counter()

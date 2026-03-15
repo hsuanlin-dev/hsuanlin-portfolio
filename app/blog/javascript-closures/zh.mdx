@@ -1,0 +1,32 @@
+
+
+---
+title: JavaScript 閉包 (Closures)
+description: 用來測試路由與連結的暫時文章。
+---
+
+# JavaScript 閉包
+
+這是一篇 **暫時的文章內容**，用來測試：
+
+- MDX 渲染
+- 路由
+- 中英文切換
+
+之後會再補上完整內容。
+
+## 範例
+
+```javascript
+function outer() {
+  let count = 0
+
+  return function inner() {
+    count++
+    console.log(count)
+  }
+}
+
+const counter = outer()
+counter()
+counter()
