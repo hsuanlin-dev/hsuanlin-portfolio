@@ -15,15 +15,31 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       caption: string
     }) => {
       return (
-        <figure>
-          <img src={src} alt={alt} className="rounded-xl" />
-          <figcaption className="text-center">{caption}</figcaption>
+        <figure className="my-8">
+          <img src={src} alt={alt} className="rounded-xl w-full" />
+          {caption && (
+            <figcaption className="text-center mt-2 text-sm text-zinc-500">
+              {caption}
+            </figcaption>
+          )}
         </figure>
       )
     },
+    // 優化後的 code 組件
     code: ({ children, ...props }: ComponentPropsWithoutRef<'code'>) => {
-      const codeHTML = highlight(children as string)
-      return <code dangerouslySetInnerHTML={{ __html: codeHTML }} {...props} />
+      // 確保 children 是字串，如果不是則轉為字串或回傳原始內容
+      const codeContent = typeof children === 'string' 
+        ? children 
+        : Array.isArray(children) 
+          ? children.join('') 
+          : '';
+
+      if (codeContent) {
+        const codeHTML = highlight(codeContent)
+        return <code dangerouslySetInnerHTML={{ __html: codeHTML }} {...props} />
+      }
+      
+      return <code {...props}>{children}</code>
     },
   }
 }

@@ -30,3 +30,48 @@
   --sh-property: #73daca;
   --sh-entity: #e0af68;
 }
+
+
+/* --- 放在檔案最底部 --- */
+
+/* 1. 移除 Tailwind Typography (prose) 預設在 code 前後加上的反引號 */
+.prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::before,
+.prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::after {
+  content: "" !important;
+}
+
+/* 2. 針對程式碼區塊容器 (pre) 的樣式優化 */
+.prose pre {
+  background-color: #161617 !important; /* 調整為更深一點的灰，匹配專業技術部落格底色 */
+  padding: 1.5rem !important;
+  border-radius: 0.75rem;
+  line-height: 1.6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  overflow-x: auto;
+  border: 1px solid #2a2a2c; /* 邊框也同步調暗，讓過渡更自然 */
+}
+
+/* 3. 修正：當 code 在 pre 裡面時，強制背景透明，避免顏色不均 */
+.prose pre code {
+  background-color: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: inherit !important;
+}
+
+/* 4. 針對「行內程式碼」(Inline Code) 的獨立樣式 */
+.prose :where(:not(pre) > code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  background-color: #2a2a2c !important; 
+  color: #e4e4e7;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.4rem;
+  font-weight: 500;
+}
+
+/* 5. Sugar High 語法高亮顏色與對比度優化 */
+.sh__token--keyword { color: #ff79c6; }   /* 關鍵字：粉色 */
+.sh__token--string { color: #f1fa8c; }    /* 字串：黃色 */
+/* 註解：使用 Zinc-500 (#71717a)，降低亮度使其具有「註解感」，同時保持可讀性 */
+.sh__token--comment { color: #71717a !important; font-style: italic; } 
+.sh__token--function { color: #50fa7b; }  /* 函數：綠色 */
+.sh__token--variable { color: #8be9fd; }  /* 變數：青色 */
