@@ -4,17 +4,18 @@ import { useEffect, useState } from "react"
 
 export default function LangClient({ slug }: { slug: string }) {
 
-  const [lang, setLang] = useState<"en" | "zh">("zh")
+  const [lang, setLang] = useState<"en" | "zh">(() => {
+    if (typeof window === "undefined") return "zh"
+    return (localStorage.getItem("lang") as "en" | "zh") || "zh"
+  })
+
   const [Post, setPost] = useState<any>(null)
 
   useEffect(() => {
 
-    const savedLang = localStorage.getItem("lang") as "en" | "zh" | null
-    if (savedLang) setLang(savedLang)
-
     const handleChange = () => {
       const newLang = localStorage.getItem("lang") as "en" | "zh"
-      setLang(newLang)
+      if (newLang) setLang(newLang)
     }
 
     window.addEventListener("languageChange", handleChange)
