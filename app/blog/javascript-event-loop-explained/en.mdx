@@ -1,3 +1,263 @@
-# JavaScript Event Loop Explained
+---
+title: Understanding the JavaScript Event Loop: Microtasks, Macrotasks, and a Kitchen Analogy
+description: A practical guide to understanding the JavaScript Event Loop, microtasks, and macrotasks through a stir-fry restaurant analogy.
+date: 2026-03-20
+published: true
+tags:
+  - JavaScript
+  - Event Loop
+  - Frontend
+  - Node.js
+---
 
-This article explains how the JavaScript Event Loop works and how microtasks and macrotasks are scheduled.
+# Understanding the JavaScript Event Loop: Microtasks, Macrotasks, and a Kitchen Analogy
+
+## 👨‍🍳 Understanding the JavaScript Event Loop: Microtasks, Macrotasks, and a Kitchen Analogy
+
+### Why Doesn't the Webpage "Freeze"? — The Trade-off Between Synchronous and Asynchronous Execution
+
+JavaScript is a single-threaded language, meaning that the Call Stack can only execute one task at a time. It does not support parallel execution within the same thread. To prevent the application from being blocked by time-consuming operations—such as API requests or timers—JavaScript relies on asynchronous mechanisms.
+
+Instead of executing these operations on the main thread, they are delegated to the runtime environment (such as the browser or Node.js). Once completed, their callbacks are placed into a queue and scheduled for execution by the Event Loop.
+
+* **Synchronous (Sync):** Execution behaves like a queue in a restaurant—each task must wait for the one before it to complete. If a long-running operation (such as a network request) blocks the line, the main thread becomes occupied, causing the entire application to appear frozen.
+* **Asynchronous (Async):** To avoid blocking, JavaScript delegates time-consuming tasks (such as timers or API requests) to the runtime environment. Meanwhile, the main thread continues executing other code. Once these tasks are completed, their callbacks are queued and later executed by the Event Loop.
+
+---
+
+### **The Event Loop in the Browser**
+
+In the browser, each iteration of the Event Loop follows this order:
+
+1. Execute synchronous code in the Call Stack
+2. Clear all tasks in the Microtask Queue
+3. Execute one Macrotask
+4. Repeat the cycle
+
+---
+
+### **Differences Between the Node.js and Browser Event Loop**
+
+Node.js is built on top of **libuv**. While the overall concept is similar to the browser Event Loop, Node.js divides its loop into six major phases, each containing its own internal execution cycle.
+
+1. **timers** – Handles `setTimeout` and `setInterval` callbacks
+2. **pending callbacks** – Executes callbacks from certain asynchronous operations
+3. **idle, prepare** – Used internally by the Node.js runtime
+4. **poll** – Waits for new I/O events and executes related callbacks
+5. **check** – Executes `setImmediate` callbacks
+6. **close callbacks** – Handles cleanup callbacks such as `socket.on('close')`
+
+**Node.js internal execution cycle:**
+
+(1) Synchronous tasks → (2) Microtasks → (3) Macrotasks
+
+* `process.nextTick` – A Node.js-specific API with the **highest priority** in the microtask queue
+* `Promise.then` – A microtask that is executed before macrotasks
+* `setImmediate` – A Node.js-specific API executed during the **check phase**
+
+---
+
+The Event Loop is a core mechanism that ensures the main thread is not blocked by time-consuming operations, allowing web applications to remain responsive and interactive. To better understand this complex scheduling process, we can think of the entire JavaScript runtime as a **"stir-fry restaurant."**
+
+### The Three Core Roles in the Kitchen
+
+The efficiency of this system relies on a clear division of responsibilities:
+
+* **The Chef (Call Stack):** The only worker in the kitchen (single-threaded). The chef can only cook one dish at a time and follows a strict rule—**as long as there are dishes on the counter (synchronous tasks), the chef will not look at the queue.**
+* **Kitchen Assistants (Web APIs):** Responsible for handling time-consuming tasks, such as timers (`setTimeout`) and network requests (`fetch`). Once a task is completed, the assistant sends a corresponding "ticket" to the queue.
+* **The Dispatcher — Event Loop:** The central coordinator of the system. It continuously checks whether the Call Stack is empty. Once the chef is free, it moves tasks from the queue into the Call Stack in the correct order.
+
+### Understanding the Event Loop Through a Kitchen SOP
+
+This process runs continuously as a loop:
+
+* **Phase 1: The Chef Clears the Counter (Synchronous Execution)**
+  The chef finishes all visible synchronous tasks (such as `console.log` or computations). If a task like `setTimeout` appears, it is delegated to the kitchen assistants.
+* **Phase 2: Assistants Complete Tasks and Queue Them (Async Completion)**
+  Once the assistants finish their work—whether a timer expires or data is fetched—they place the corresponding callback into the **regular queue (macrotask queue)**. If a Promise is resolved, it is placed into the **VIP queue (microtask queue)**.
+* **Phase 3: The Dispatcher Checks the VIP Queue (Processing Microtasks)**
+  When the chef becomes idle, the dispatcher first checks the **VIP queue**. If there are tasks, they are moved one by one into the Call Stack until the **microtask queue is completely cleared**.
+* **Phase 4: The Dispatcher Checks the Regular Queue (Processing Macrotasks)**
+  Once the VIP queue is empty, the dispatcher moves to the **regular queue** and takes the **first task** to be executed.
+* **Repeat the Cycle:**
+  After the chef completes that task, the dispatcher returns to **Phase 3** to check for newly added microtasks. This cycle continues indefinitely.
+
+```
+         [ 1. Chef: Call Stack ]          [ 2. Kitchen Assistants: Web APIs ]
+        +---------------------------+    +-----------------------------------+
+        |  Current Dish (Sync Code) | -->|  ⏱ Timer Countdown (setTimeout)  |
+        |  -----------------------  |    |  🌐 Network Requests (fetch/AJAX) |
+        |  (Stack of Plates: LIFO)  |    |  🖱 Event Listeners (DOM Events)  |
+        +-------------+-------------+    +-------------+--------------------+
+                      |                                |
+        (4) When the chef finishes                     | (3) When tasks finish
+            (Call Stack becomes empty)                 |     send the ticket down
+            the dispatcher steps in                    |
+                      |                                v
+                      |            +----------------------------------------+
+                      |            | [ 3. Dispatcher: Event Loop ] (looping)|
+                      |            | Rules:                                 |
+                      |            | - The Call Stack must be empty         |
+                      |            | - Clear VIP tasks first                |
+                      |            | - Then take one regular task           |
+                      |            +------------------+---------------------+
+                      |                               |
+                      +<------------------------------+
+                      |     Check VIP queue first,
+                      |     otherwise take from regular queue (FIFO)
+                      |
+        +-------------+-------------+   +-------------------------------+
+        |   [ VIP Area ]            |   |   [ Regular Area ]             |
+        |   (Microtask Queue)       |   |   (Task / Macrotask Queue)     |
+        |   - Promise.then()        |   |   - setTimeout callbacks       |
+        |   - async/await resume    |   |   - Click event handlers       |
+        +---------------------------+   +-------------------------------+
+```
+
+> The Event Loop constantly checks whether the Call Stack is empty.
+> When it is empty, it processes all microtasks first, then executes one macrotask before repeating the cycle.
+
+---
+
+### Queue Priority: Microtasks vs Macrotasks
+
+Not all tasks are treated equally. The dispatcher follows a strict priority order when scheduling tasks:
+
+* **VIP Queue — Microtask Queue:**
+  * **Includes:** `Promise.then`, `queueMicrotask`, `MutationObserver`, and `async/await` continuation tasks
+  * ⮕ In Node.js, `process.nextTick` has a higher priority than all other microtasks
+  * **Rule:** Once the Call Stack is empty, the dispatcher will process **all** tasks in the microtask queue until it is completely drained
+* **Regular Queue — Macrotask Queue:**
+  * **Includes:** callbacks from `setTimeout`, `setInterval`, `setImmediate`, and DOM event handlers
+  * **Rule:** The dispatcher will only move to the macrotask queue after the microtask queue is empty. It processes **one task at a time**, since executing a macrotask may generate new microtasks
+
+---
+
+### Execution Order Example
+
+```js
+console.log("A"); // Executed immediately by the chef
+
+setTimeout(() => {
+  console.log("B"); // Handled by assistants → placed in the macrotask queue
+}, 0);
+
+Promise.resolve().then(() => {
+  console.log("C");
+  // Scheduled as a microtask by the JS engine
+  // (like the chef adding a VIP order directly)
+});
+
+console.log("D"); // Executed next by the chef
+```
+
+1. **Execute A and D:**
+   These are synchronous tasks, so they are executed immediately by the Call Stack.
+2. **Process the VIP Queue (Microtasks):**
+   Once the Call Stack is empty, the Event Loop processes the microtask queue. Task **C** is executed.
+3. **Process the Regular Queue (Macrotasks):**
+   After the microtask queue is cleared, the Event Loop processes the macrotask queue. Task **B** is executed.
+
+**⮕ Final execution order: `A → D → C → B`**
+
+---
+
+### **process.nextTick vs Promise**
+
+```js
+process.nextTick(() => console.log('tick'));         // Highest-priority microtask (Node.js only)
+Promise.resolve().then(() => console.log('promise')); // Standard microtask
+setTimeout(() => console.log('timeout'), 0);          // Macrotask
+console.log('sync');                                  // Synchronous code executes first
+```
+
+**⮕ Output:** `sync → tick → promise → timeout`
+
+---
+
+### **async/await and the Event Loop**
+
+```js
+async function foo() {
+  console.log('A');
+
+  await Promise.resolve();
+  // Execution pauses here; the remaining code is scheduled as a microtask
+  console.log('B');
+}
+
+console.log('C');
+foo();
+console.log('D');
+```
+
+**⮕ Output:** `C → A → D → B`
+
+---
+
+## **The Position of requestAnimationFrame in the Event Loop**
+
+`requestAnimationFrame` (rAF) is a **browser-provided API** designed to optimize animation performance. It occupies a special position in the Event Loop—it is neither a microtask nor a macrotask.
+
+```
+Browser frame execution order:
+1. Execute synchronous code
+2. Execute all microtasks (e.g., Promise.then, queueMicrotask)
+3. Execute requestAnimationFrame callbacks ← special timing
+   (runs right before the next frame is rendered)
+4. Browser rendering (layout, paint, composite)
+5. Execute one macrotask (e.g., setTimeout, setInterval)
+6. Repeat from step 1 for the next cycle
+```
+
+This allows `requestAnimationFrame` to update the UI at the last possible moment before rendering, ensuring that animation calculations are applied immediately without being delayed to the next frame.
+
+### Execution Example
+
+```js
+console.log('script start');
+
+setTimeout(() => {
+  console.log('setTimeout 1');
+
+  Promise.resolve().then(() => {
+    console.log('microtask inside setTimeout 1');
+  });
+}, 0);
+
+Promise.resolve().then(() => {
+  console.log('microtask 1');
+});
+
+Promise.resolve().then(() => {
+  console.log('microtask 2');
+});
+
+setTimeout(() => {
+  console.log('setTimeout 2');
+}, 0);
+
+requestAnimationFrame(() => {
+  console.log('rAF callback');
+});
+
+console.log('script end');
+```
+
+### Execution Order Breakdown
+
+1. **Synchronous execution:**
+   `script start` → `script end`
+2. **Process all microtasks in the current frame:**
+   `microtask 1` → `microtask 2`
+3. **Execute requestAnimationFrame callbacks:**
+   `rAF callback` (right before the next repaint)
+4. **Browser rendering phase**
+5. **Process macrotasks:**
+   `setTimeout 1` → `microtask inside setTimeout 1` (note: this microtask runs immediately after the macrotask callback) → `setTimeout 2`
+
+---
+
+**⮕ Final output:**
+
+`script start` → `script end` → `microtask 1` → `microtask 2` → `rAF callback` → `setTimeout 1` → `microtask inside setTimeout 1` → `setTimeout 2`

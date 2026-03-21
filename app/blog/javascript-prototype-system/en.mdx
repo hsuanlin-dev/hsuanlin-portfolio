@@ -1,24 +1,259 @@
+# JavaScript Prototype System & ES6 Classes
 
+### From "Asking Dad for Tools" to a Complete Understanding of Syntactic Sugar
 
 ---
-title: JavaScript Prototype System
-description: Placeholder article for prototype system.
+
+### 1. Core Concept of the Prototype System (Family Analogy)
+
+JavaScript uses **Prototypal Inheritance** to enable objects to share properties, instead of duplicating them like traditional class-based languages.
+
+- **Prototype**: Think of it as "your dad's skill set"
+- **Prototypal Inheritance**: You don't need to build your own tools — as long as you're your dad's child, you can simply go into his room and use them
+- **Prototype Chain**: When you don't know something, you trace your family tree upward — ask your dad → your grandfather → … until reaching `null`
+
+**Summary**
+
+- Prototype = your "ancestors"
+- Prototypal inheritance = "I have access to what my ancestors own"
+- Prototype chain = the process of "looking upward through lineage starting from yourself"
+
 ---
 
-# JavaScript Prototype System
+### 2. Three Easily Confused "Prototype" Terms
 
-This is a **placeholder article** to verify MDX rendering.
+| Term | Owned by | What it is | Analogy |
+| --- | --- | --- | --- |
+| `[[Prototype]]` | Every object | Internal hidden link (DNA) | The father's name on your ID (hidden) |
+| `__proto__` | Every object | Public accessor to the prototype | A "family tree navigator" in your pocket |
+| `prototype` | Functions only | The toolbox passed down to the next generation | The "inheritance chest / skill box" prepared by the father |
 
-## Example
+Your `__proto__` (the navigator) points to your father's `prototype` (the toolbox), and this entire relationship is internally stored in your `[[Prototype]]`.
 
-```javascript
-function Person(name) {
-  this.name = name
+---
+
+### 3. Code Demonstration (Parent-Child Inheritance)
+
+```jsx
+// 1. Father (constructor function)
+function Father() {}
+
+// 2. Father puts heirlooms into the toolbox
+Father.prototype.treasure = "A pile of gold";
+
+// 3. Create a son
+const son = new Father();
+
+// Verification
+console.log(son.__proto__ === Father.prototype);     // true
+console.log(son.treasure);                           // "A pile of gold" (found via prototype chain)
+console.log(son.__proto__.__proto__.__proto__);      // null (end of the chain)
+```
+
+### 3.1 The Four Steps of `new` (What Actually Happens Behind the Scenes?)
+
+When we write `const son = new Father();`, JavaScript secretly performs the following **four steps**:
+
+1. **Create a new empty object**
+
+    Just like giving birth to a "newborn" — it starts with nothing.
+
+2. **Link the new object's prototype (`[[Prototype]]`) to the constructor's `prototype`**
+
+    This means the newborn's "family tree navigator" is directly connected to the father's "toolbox":
+
+    `son.__proto__ === Father.prototype` (this is the most critical step, as it establishes the prototype chain!)
+
+3. **Bind `this` inside the constructor to the new object**
+
+    The father starts teaching the child: `this.name = ...` is essentially writing properties directly onto the newborn itself.
+
+4. **Execute the code inside the constructor**
+
+    If the constructor does not explicitly `return` an object, it will automatically return the new object; if it does return an object, that object will be used instead (which is generally not recommended).
+
+Manual implementation of `new` (bonus point 💡):
+
+```jsx
+function myNew(Constructor, ...args) {
+  // Step 1: Create empty object + Step 2: link prototype
+  const obj = Object.create(Constructor.prototype);
+
+  // Step 3: bind this and execute constructor
+  const result = Constructor.apply(obj, args);
+
+  // Step 4: return object (use returned object if constructor returns one)
+  return result instanceof Object ? result : obj;
 }
 
-Person.prototype.sayHello = function () {
-  console.log("Hello " + this.name)
+const son2 = myNew(Father);
+console.log(son2.__proto__ === Father.prototype); // true
+```
+
+These four steps perfectly explain why instances created with `new` can automatically access the father's "skills" through the prototype chain.
+
+---
+
+### 4. Property Shadowing and Asymmetric Read/Write Behavior
+
+**Analogy**:
+
+When reading → If you don't have money, you check your dad's wallet (look up the prototype chain)
+
+When writing → If you earn money yourself, you keep it in your own pocket, not your dad's wallet
+
+```jsx
+son.treasure = "My own savings";
+
+console.log(son.treasure);               // "My own savings" (own property takes priority)
+console.log(Father.prototype.treasure);  // "A pile of gold" (dad's is still there!)
+
+delete son.treasure;
+console.log(son.treasure);               // "A pile of gold" (falls back to dad again)
+```
+
+**If you really want to change the family inheritance (reckless move)**
+
+You must directly modify the father's toolbox:
+
+```jsx
+Father.prototype.treasure = "Nothing left";
+// or
+son.__proto__.treasure = "Sold everything";
+```
+
+**Engineer's note**: Directly modifying `Array.prototype` or `Object.prototype` can cause **prototype pollution** — it's like altering the DNA of all humanity. Never do this in production environments.
+
+---
+
+### 5. ES6 Class: A Wrapped Prototype Mechanism (Syntactic Sugar)
+
+Although the syntax looks cleaner, remember: **`class` is just a way to wrap the complex process of "going to your dad and opening his toolbox" into something that looks more professional and organized.** Under the hood, it still runs on the same prototype chain mechanism. This is what we call **syntactic sugar**.
+
+### 5.1 Traditional Syntax vs. Class Syntax
+
+```jsx
+// Traditional "ask your dad" syntax
+function Father() {}
+Father.prototype.treasure = "A pile of gold";
+Father.prototype.sayHi = function() {
+  console.log("Hello, child");
+};
+const son = new Father();
+```
+
+```jsx
+// Modern class syntax
+class Father {
+  constructor() {
+    // Things that every instance owns individually
+  }
+  sayHi() {            // Automatically placed into Father.prototype
+    console.log("Hello, child");
+  }
 }
 
-const user = new Person("Alex")
-user.sayHello()
+// Can still mix with prototype assignments
+Father.prototype.treasure = "A pile of gold";
+const son = new Father();
+```
+
+### 5.2 Inheritance with `extends` and `super`
+
+```jsx
+class Son extends Father {
+  constructor() {
+    super();              // Required! Call the parent to inherit the lineage
+    this.pocketMoney = 100;
+  }
+  sayHi() {                     // Overrides the father's method
+    console.log("Oh! I'm the son!");
+  }
+}
+const me = new Son();
+```
+
+### 5.3 What Happens Under the Hood? (Key Breakdown)
+
+When you write `class Son extends Father`, JavaScript secretly does the following behind the scenes:
+
+1. Automatically sets `Son.prototype.__proto__ = Father.prototype` (linking the prototype chain)
+2. `super()` ensures the parent constructor runs once first
+3. Methods inside the class are automatically placed into the `prototype` toolbox (not duplicated on each instance)
+
+**Final verification** (you can still inspect the prototype chain even when using class):
+
+```jsx
+console.log(me.__proto__ === Son.prototype);                // true
+console.log(Son.prototype.__proto__ === Father.prototype);  // true
+```
+
+---
+
+### 5.4 Full Code Comparison (Class vs Function + Private Members)
+
+**Class Syntax (Modern, with native private fields)**
+
+```jsx
+class Person {
+  // Truly private at the language level, cannot be accessed externally
+  #privateField = 'private';
+
+  constructor(name, age) {
+    this.name = name;
+    this.age = age;
+  }
+
+  hello() {
+    return `Hello, I'm ${this.name}`;
+  }
+
+  getPrivate() {
+    return this.#privateField;
+  }
+
+  static create(name, age) {
+    return new Person(name, age);
+  }
+}
+```
+
+**Traditional Function + Closure Syntax**
+
+```jsx
+function Person(name, age) {
+  this.name = name;
+  this.age = age;
+
+  // Closure to simulate a private variable
+  let privateField = 'private';
+
+  this.getPrivate = function() {
+    return privateField;
+  };
+}
+
+Person.prototype.hello = function() {
+  return `Hello, my name is ${this.name}`;
+};
+
+Person.create = function(name, age) {
+  return new Person(name, age);
+};
+```
+
+**Key Differences**
+
+- `#privateField`: truly private — even subclasses cannot directly access it
+- Closure-based private: compatible with older environments, but creates a new closure per instance
+- Both approaches share the same prototype chain: an instance's `__proto__` points to `Person.prototype`
+
+---
+
+### 6. Summary (Remember the Prototype System in 3 Sentences)
+
+1. `prototype` is the father's toolbox (where shared rules and methods are defined)
+2. `__proto__` is your navigator (the path to find your father)
+3. `[[Prototype]]` is the internal family record (the actual inheritance link)
+
+ES6 `class` is just a wrapper that makes the code look more modern and closer to traditional OOP, but underneath it still follows the same "look up the family tree and open the toolbox" prototype chain. Once you understand the four steps of `new`, you can fully explain the entire process from instance creation to inheritance!

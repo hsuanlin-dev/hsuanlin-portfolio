@@ -261,7 +261,7 @@ export const BLOG_POSTS: BlogPost[] = [
       zh: 'JavaScript 原型系統與 ES6 Class：從「找爸爸翻寶箱」到語法糖完整解析',
     },
     description: {
-      en: 'Understand JavaScript closures through the “explorer’s backpack” analogy and learn how scope persistence works in practice.',
+      en: 'Using the “prototype treasure hunt” analogy, this walks through how the JavaScript prototype chain works and how ES6 classes function under the hood.',
       zh: '透過「找爸爸翻寶箱」的比喻理解 JavaScript Prototype Chain 與 ES6 Class 的運作原理。',
     },
     link: '/blog/javascript-prototype-system',

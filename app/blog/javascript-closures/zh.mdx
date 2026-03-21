@@ -1,32 +1,356 @@
+# JavaScript 閉包 (Closure)
 
+閉包是 JavaScript 的核心特性，能讓函式記住外部變數，廣泛用於狀態管理、非同步處理和封裝資料。它解決變數作用域的問題，讓程式更有彈性，並在 React 等框架中扮演關鍵角色（如 useState）。
 
 ---
-title: JavaScript 閉包 (Closures)
-description: 用來測試路由與連結的暫時文章。
----
 
-# JavaScript 閉包
+## 閉包的核心比喻：探險家與他的神奇背包
 
-這是一篇 **暫時的文章內容**，用來測試：
+想像你是一個探險家（這代表一個**函式**）。
 
-- MDX 渲染
-- 路由
-- 中英文切換
+- **一般情況：** 你每次出門探險（執行函式），結束後回家就會把身上所有的裝備丟掉。下次出門又是兩手空空，什麼都不記得。
+- **閉包情況：** 你在出發前，你的導師給了你一個**「神奇背包」**。當你在森林裡撿到一個寶石（變數）放進背包後，就算你探險結束回到家，**那個背包依然會掛在你肩上，裡面的寶石也不會消失。**
 
-之後會再補上完整內容。
+下次你再出發時，打開背包，那顆寶石還在那裡。
 
-## 範例
+範例程式碼：
 
-```javascript
-function outer() {
-  let count = 0
-
-  return function inner() {
-    count++
-    console.log(count)
-  }
+```jsx
+function 冒險者工會() {
+  let 寶石數量 = 0;   // 這是背包裡的寶石（私有變數）
+  return function 探險() {
+    寶石數量++;      // 每次探險，寶石就加一顆
+    console.log("背包裡現在有 " + 寶石數量 + " 顆寶石");
+  };
 }
 
-const counter = outer()
-counter()
-counter()
+// 建立一個專屬的探險計畫
+const 我的探險 = 冒險者工會();
+我的探險(); // 輸出：背包裡現在有 1 顆寶石
+我的探險(); // 輸出：背包裡現在有 2 顆寶石
+我的探險(); // 輸出：背包裡現在有 3 顆寶石
+```
+
+解釋：外層函式 `冒險者工會` 執行完後，變數 `寶石數量` 應該消失，但因為內層函式 `探險` 被回傳並保存，它像隱形的繩子拉住背包，讓寶石數量持續存在。
+
+---
+
+## 閉包的基本定義與原理
+
+- 閉包的正式定義：閉包是函式與其定義時的詞法環境（lexical environment）的組合，即使在外層作用域結束後，仍能存取外部變數。
+- 詞法作用域 (Lexical Scope) 的關係：變數範圍由定義位置決定，非執行位置；閉包基於此，讓內層函式「帶著出生環境」到處執行。
+- 閉包的三個重點總結：
+    1. 內外嵌套：函式裡有函式。
+    2. 變數記憶：內層可存取外層變數。
+    3. 長生不老：外層執行完後，被參考的變數不會被回收。
+- 程式碼示例：簡單的計數器閉包，展示如何回傳內層函式並保留狀態。
+
+範例程式碼（基本閉包）：
+
+```jsx
+let name = 'Global'; // 全域變數
+
+function outer() {
+  let name = 'Outer'; // 外層變數
+  function inner() {
+    console.log(name); // 存取外層的 name（詞法作用域）
+  }
+  return inner;
+}
+
+const innerFn = outer();
+innerFn(); // 輸出：'Outer' - 即使在全域執行，仍記得定義時的環境
+```
+
+解釋：內層函式 `inner` 記住外層的 `name`，即使 `outer` 結束後，閉包讓它不被垃圾回收。這展示了詞法作用域如何讓閉包「帶著環境」運行。
+
+- 執行的步驟
+
+    ### 步驟 1: 全域變數宣告（程式碼第 1 行）
+
+    - **執行內容**：`let name = 'Global';`
+    - **name 的狀態變化**：
+        - 在**全域作用域 (Global Scope)** 中建立一個變數 `name`，其值為 `'Global'`。
+        - 此時，記憶體中只有一個 `name`：全域 `name = 'Global'`。
+    - **作用域鏈**：全域作用域是最外層，沒有父作用域。
+    - **變化說明**：這是程式碼啟動時的初始狀態。全域變數會一直存在，除非被明確修改或腳本結束。
+    - **目前輸出**：無（僅宣告）。
+
+    ### 步驟 2: 函式定義（程式碼第 3-9 行）
+
+    - **執行內容**：定義 `function outer() { ... }`
+        - 這是一個函式宣告，不會立即執行。只在記憶體中儲存函式體，包括內部的 `let name = 'Outer';` 和 `function inner() { ... }`，但這些程式碼尚未運行。
+    - **name 的狀態變化**：
+        - 全域 `name` 保持不變：`'Global'`。
+        - 內層程式碼（`name = 'Outer'`）尚未執行，因此沒有新 `name` 建立。
+    - **作用域鏈**：
+        - `outer` 函式的作用域在定義時綁定到全域作用域（其父作用域）。
+        - `inner` 函式的作用域在定義時綁定到 `outer` 的作用域（詞法作用域：`inner` 「出生」在 `outer` 中，因此它能看到 `outer` 的變數）。
+    - **變化說明**：函式定義不會改變任何變數狀態，只是準備好後續呼叫。
+    - **目前輸出**：無。
+
+    ### 步驟 3: 執行 outer 函式並賦值（程式碼第 11 行：`const innerFn = outer();`）
+
+    - **執行內容**：呼叫 `outer()`，進入函式體。這是第一個函式呼叫。
+        - 第一子步驟：執行 `let name = 'Outer';`
+            - 在**outer 的局部作用域 (Local Scope)** 中建立一個新的 `name`，其值為 `'Outer'`。這不會影響全域 `name`（變數遮蔽：局部變數優先於全域）。
+        - 第二子步驟：定義 `function inner() { ... }`
+            - `inner` 函式被定義，但不執行。`inner` 中的 `console.log(name)` 會根據詞法作用域查找 `name`：先找自己的作用域（無），再找父作用域（outer 的 `name = 'Outer'`），不會找全域。
+        - 第三子步驟：`return inner;`
+            - 返回 `inner` 函式的參考（不是執行它）。此時，`outer` 函式執行結束，其局部作用域理論上應該被垃圾回收。
+    - **name 的狀態變化**：
+        - 全域 `name` 保持 `'Global'`（未受影響）。
+        - 在 outer 局部作用域中暫時建立 `name = 'Outer'`。
+        - **閉包形成**：因為 `inner` 被返回並引用了 outer 的 `name`，JavaScript 引擎會建立一個閉包環境，將 outer 的 `name = 'Outer'` 保留在記憶體中（不被回收）。這就像一個「背包」，`inner` 帶著 outer 的變數「離開」。
+        - 現在記憶體中：
+            - 全域：`name = 'Global'`
+            - 閉包環境（與 innerFn 關聯）：`name = 'Outer'`
+    - **作用域鏈**：
+        - `inner` 的作用域鏈：inner 自身 -> outer 的閉包環境 -> 全域。
+    - **變化說明**：這是閉包的關鍵時刻。outer 結束，但其變數因被 inner 引用而「長生不老」。`innerFn` 現在持有 inner 的參考，以及隱含的閉包。
+    - **目前輸出**：無（僅返回函式）。
+
+    ### 步驟 4: 執行 innerFn（程式碼第 12 行：`innerFn();`）
+
+    - **執行內容**：呼叫 `innerFn()`，即執行 `inner()` 函式體。這是第二個函式呼叫（但 inner 是透過 outer 返回的閉包）。
+        - 執行 `console.log(name);`
+            - 根據詞法作用域，`name` 的解析：在 inner 作用域中查找（無），然後向上到其定義時的父作用域（outer 的閉包環境），找到 `name = 'Outer'`。
+            - **不會** 去全域找 `name = 'Global'`，因為詞法作用域是靜態的（定義時決定），不是動態的（執行時決定）。
+    - **name 的狀態變化**：
+        - 全域 `name` 仍為 `'Global'`（未使用）。
+        - 閉包中的 `name = 'Outer'` 被讀取，但值不變。
+        - 記憶體中無新變化：閉包環境繼續保留 name = 'Outer'，因為 innerFn 還存在。
+    - **作用域鏈**：
+        - 執行時：inner 的執行上下文 -> 閉包（outer 的環境） -> 全域。
+    - **變化說明**：即使 inner 在全域環境中執行（因為 innerFn 是全域變數），它仍「記得」定義時的環境（outer）。這就是閉包的「記憶」效果。如果沒有閉包，outer 的 name 早就被回收，inner 會報錯或找全域 name。
+    - **目前輸出**：`'Outer'`（如註解所述）。
+
+    ### 總結與注意事項
+
+    - **整體 name 變化軌跡**：
+        - 起始：全域 `name = 'Global'`
+        - outer 執行中：新增局部 `name = 'Outer'`（遮蔽全域）
+        - outer 結束後：局部 name 透過閉包保留
+        - inner 執行：讀取閉包中的 `name = 'Outer'`
+    - **為什麼輸出 'Outer' 而不是 'Global'？** 因為詞法作用域和閉包：inner 「出生」在 outer 中，永遠綁定 outer 的環境。即使在全域呼叫，它不會動態切換到全域 name。
+    - **潛在問題**：如果多次呼叫 outer()，每次都會建立新的閉包和新的 `name = 'Outer'`。但這裡只呼叫一次。
+    - **與探險家背包比喻的關聯**：outer 是「背包工廠」，inner 是「背包」（攜帶 outer 的 name），innerFn 是你「帶回家」的背包。即使 outer 「回家」，背包裡的「寶物」（name = 'Outer'）仍存在。
+
+---
+
+## 常見困惑：函式執行 vs. 函式參考
+
+- 為什麼要存成變數（如 `const counter = createCounter()`）？直接呼叫 `createCounter()()` 會每次重置狀態，因為沒保留同一個背包；存成變數則持續使用同一背包。
+- 執行與參考的差別：`counter` 是函式本人（按鈕），`counter()` 是執行它（按下按鈕）；比喻為背包工廠生產按鈕，不按就不動作。
+- 常見錯誤示例：多次直接呼叫 `outer()` 導致狀態重置；使用閉包則維持連續記憶。
+- 圖解說明：作用域鏈與回傳關係，強調隱形繩子拉住變數不被回收。
+
+範例程式碼（執行 vs. 參考）：
+
+```jsx
+function outer() {
+  let a = 0;
+  function inner() {
+    a += 1;
+    console.log(a);
+  }
+  return inner;
+}
+
+// 正確使用：存成變數，持續使用同一閉包
+const inner = outer();
+inner(); // 輸出：1
+inner(); // 輸出：2
+inner(); // 輸出：3
+
+// 錯誤使用：直接呼叫，每次重置
+outer()(); // 輸出：1（新閉包）
+outer()(); // 輸出：1（新閉包）
+outer()(); // 輸出：1（新閉包）
+```
+
+解釋：存成 `inner` 變數時，它參考同一閉包，`a` 會累加；直接呼叫 `outer()()` 每次創建新閉包，`a` 總是從 0 開始。
+
+---
+
+## 閉包的實際應用案例
+
+- **應用1：狀態保存（模擬 React useState）**
+    - 說明：閉包讓 getState/setState 記住 state，持續更新而不重置。
+    - 程式碼示例：簡化版 useState，展示 count() 和 setCount() 如何互動。
+    - 比喻連結：背包記住探險中的寶石數量，像狀態的「記憶庫」。
+
+以下是詳細程式碼範例，模擬 React useState：
+
+```jsx
+function useState(initialState) {
+  let state = initialState; // 閉包中的私有狀態
+  function getState() {
+    return state;
+  }
+  function setState(updatedState) {
+    state = updatedState;
+  }
+  return [getState, setState];
+}
+
+const [count, setCount] = useState(0);
+console.log(count()); // 輸出：0
+setCount(1);
+console.log(count()); // 輸出：1
+setCount(500);
+console.log(count()); // 輸出：500
+```
+
+解釋：閉包讓 `getState` 和 `setState` 共享並記住 `state`，模擬 React 的狀態管理。
+
+---
+
+- **應用2：快取（Memoization）**
+    - 說明：閉包儲存計算結果，避免重複運算，提高效率。
+    - 程式碼示例：快取斐波那契數列計算。
+    - 比喻連結：背包儲存先前撿到的寶石，避免每次探險都從頭找。
+
+```jsx
+function memoizeFib() {
+  let cache = {}; // 閉包中的快取物件
+  return function fib(n) {
+    if (n in cache) {
+      console.log(`從快取取值：fib(${n}) = ${cache[n]}`);
+      return cache[n];
+    }
+    if (n <= 1) {
+      return n;
+    }
+    cache[n] = fib(n - 1) + fib(n - 2);
+    console.log(`計算並快取：fib(${n}) = ${cache[n]}`);
+    return cache[n];
+  };
+}
+
+const fib = memoizeFib();
+console.log(fib(5)); // 計算過程：計算 fib(5) 到 fib(1)，輸出：5
+console.log(fib(5)); // 直接從快取取值，輸出：5
+```
+
+解釋：閉包保留 `cache`，避免重複計算斐波那契，提高效能。
+
+---
+
+- **應用3：模擬私有變數**
+    - 說明：封裝資料，防止外部直接修改，實現資料隱私。
+    - 程式碼示例：建立私有計數器，只有內層函式能存取。
+    - 比喻連結：背包只有探險家能打開，別人無法偷改寶石。
+
+以下是詳細程式碼範例，模擬私有變數：
+
+```jsx
+function createPrivateCounter() {
+  let privateCount = 0; // 私有變數，外部無法直接存取
+  return {
+    increment: function() {
+      privateCount++;
+      console.log(`計數增加：${privateCount}`);
+    },
+    getCount: function() {
+      return privateCount;
+    }
+  };
+}
+
+const counter = createPrivateCounter();
+counter.increment(); // 輸出：計數增加：1
+counter.increment(); // 輸出：計數增加：2
+console.log(counter.getCount()); // 輸出：2
+// console.log(privateCount); // 錯誤：無法存取
+```
+
+解釋：閉包讓 `privateCount` 被封裝，只有回傳的物件方法能操作它，實現私有性。
+
+- 其他應用：處理非同步（如事件回呼）、前端常見題目（如 React state 管理）。
+
+---
+
+## 閉包的缺點與注意事項
+
+- **主要缺點**：記憶體洩漏（Memory Leak）
+閉包雖然強大，能讓變數「長生不老」，但也可能讓不需要的資料一直被保留在記憶體中，無法被垃圾回收機制回收，導致記憶體使用量持續增加，長期下來會造成效能問題甚至瀏覽器崩潰。
+- **與探險家背包比喻的連結**：
+想像探險家每次出門都背了一個超大的背包，裡面裝滿了沉重的「大型資料」（largeData）。只要這個背包還掛在他身上（閉包還被引用），那些沉重的物品就不會被丟掉。即使他已經很久沒用那些東西，背包還是占著空間，讓他越走越累（記憶體越來越吃緊）。
+- **經典的記憶體洩漏範例**（事件監聽器常見情境）
+
+```jsx
+// 記憶體洩漏範例
+function setupEventHandler() {
+  // 建立一個非常大的陣列，模擬大量資料（例如圖片、使用者資料等）
+  const largeData = new Array(10000).fill('data');
+
+  // 為按鈕綁定點擊事件
+  document.getElementById('button').addEventListener('click', function() {
+    console.log(largeData.length); // 每次點擊都使用 largeData
+  });
+
+  // 函式執行結束後，largeData 理論上應該可以被回收
+  // 但因為匿名函式（事件處理函式）形成了閉包，持續引用了 largeData
+  // 所以 largeData 永遠不會被垃圾回收！
+}
+```
+
+解釋：閉包保留大物件可能導致記憶體洩漏，需主動釋放不用的閉包參考。
+
+---
+
+### 為什麼這個範例會造成記憶體洩漏？（步驟解析）
+
+1. `setupEventHandler()` 被呼叫一次（例如頁面載入時）。
+2. 建立了一個很大的陣列 `largeData`（佔用大量記憶體）。
+3. `addEventListener` 綁定了一個**匿名函式**作為事件處理器。
+4. 這個匿名函式內部引用了 `largeData` → 形成了閉包。
+5. 即使 `setupEventHandler()` 執行完畢，`largeData` 變數所在的環境因為被事件處理器閉包引用，所以不會被回收。
+6. 只要這個按鈕還在 DOM 上（通常頁面不重新載入就不會移除），事件處理器就不會被移除，閉包就一直存在 → `largeData` 永遠佔著記憶體。
+7. 如果使用者在頁面停留很久，或多次呼叫類似函式，記憶體就會不斷累積大型資料，造成洩漏。
+
+---
+
+### 正確的寫法：主動管理閉包引用
+
+```jsx
+function setupEventHandler() {
+  const largeData = new Array(10000).fill('data');
+
+  // 把處理函式抽出來成為有名函式
+  const handler = function() {
+    console.log(largeData.length);
+  };
+
+  // 綁定有名函式
+  const button = document.getElementById('button');
+  button.addEventListener('click', handler);
+
+  // 當不再需要時（例如元件卸載、頁面切換、使用者離開該頁面）
+  // 可以主動移除事件監聽器，讓閉包失去引用
+  // button.removeEventListener('click', handler);
+
+  // 或者回傳移除函式，讓呼叫者決定何時清理
+  return function cleanup() {
+    button.removeEventListener('click', handler);
+    // 此時 handler 與 largeData 失去所有強引用，才有機會被垃圾回收
+  };
+}
+
+// 使用範例
+const cleanup = setupEventHandler();
+
+// 當不需要時呼叫
+// cleanup();
+```
+
+### 避免記憶體洩漏的實務建議
+
+- 盡量使用**有名函式**而非匿名函式綁定事件，方便之後 `removeEventListener`。
+- 在 React/Vue 等框架中，使用 `useEffect` 的清理函式（return cleanup function）來移除事件監聽器、定時器等。
+- 不要讓閉包長期持有不必要的龐大資料（例如圖片資料、大的 JSON）。
+- 必要時主動把變數設為 `null` 斷開引用（雖然現代引擎優化很好，但明確斷開更保險）。
+- 使用瀏覽器開發者工具的「Memory」面板，拍攝 Heap Snapshot 來檢查是否有不該存在的閉包與大型物件。
+
+透過這個範例，我們可以看到：閉包是一把雙刃劍——它給了我們「記憶」的超能力，但也可能讓我們背負不必要的「沉重背包」。正確使用閉包的關鍵在於「適時清理背包」，讓不需要的東西能被丟掉。

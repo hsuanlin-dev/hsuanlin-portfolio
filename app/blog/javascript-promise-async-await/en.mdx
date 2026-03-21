@@ -1,3 +1,268 @@
-# JavaScript Promise async await 
+export const metadata = {
+  title: 'Deep Dive into JavaScript Async: Promise, Async/Await, and Implementing Promise.all',
+  description: 'A deep dive into JavaScript asynchronous programming, Promises, and Async/Await',
+}
 
-test test test
+# Deep Dive into JavaScript Async: Promise, Async/Await
+
+In modern front-end development, asynchronous operations are everywhere—API requests, file handling, timers, and more. While callbacks can handle these tasks, they often lead to "callback hell," making code harder to read, maintain, and debug.
+
+**Promises** were introduced to provide a more structured and readable way to manage asynchronous logic and handle errors. Building on that, **Async/Await** simplifies Promise-based code further, allowing asynchronous logic to be written in a more straightforward, synchronous-like style.
+
+---
+
+![image](/blog/js-promise/image.png)
+
+### 1. What is a Promise? What is it used for?
+
+A **Promise** is an object that represents a value that will be completed in the future. It is used to handle the results of asynchronous operations.
+
+A Promise has three states, and once the state changes, it cannot be reversed:
+
+- **Pending**: Initial state, the asynchronous operation is still in progress
+- **Fulfilled**: The operation completed successfully with a resolved value
+- **Rejected**: The operation failed with an error
+
+```jsx
+const promise = new Promise((resolve, reject) => {
+  // Perform async operation...
+  if (success) {
+    resolve(value);   // → Fulfilled
+  } else {
+    reject(error);    // → Rejected
+  }
+});
+```
+
+The Promise constructor takes an **executor** function, which receives two arguments: `resolve` and `reject`.
+
+---
+
+### 2. Promise State Transition Rules (Common Interview Topic)
+
+1. The initial state is always **Pending**
+2. It can only transition from **Pending** to **Fulfilled** or **Rejected**
+3. **State is immutable once changed** (it cannot switch again)
+4. When the state changes, the corresponding `.then()` or `.catch()` callback is automatically triggered
+
+---
+
+### 3. Why Do We Need Promises? (Solving Callback Hell)
+
+Traditional callback patterns often lead to deeply nested code:
+
+```jsx
+doSomething(function(result) {
+  doSomethingElse(result, function(newResult) {
+    doThirdThing(newResult, function(finalResult) {
+      console.log(finalResult);
+    }, failureCallback);
+  }, failureCallback);
+}, failureCallback);
+```
+
+Using Promises makes the same logic much cleaner:
+
+```jsx
+doSomething()
+  .then(result => doSomethingElse(result))
+  .then(newResult => doThirdThing(newResult))
+  .then(finalResult => console.log(finalResult))
+  .catch(failureCallback);
+```
+
+Promises solve several issues found in traditional callbacks:
+
+- **Avoid callback hell**: Reduces deeply nested and hard-to-maintain code
+- **Unified error handling**: Use `.catch()` to handle errors in one place
+- **Chaining**: Enables clear control flow with `.then()`
+- **Better semantics**: State transitions are more intuitive and predictable
+
+---
+
+### 4. Async/Await — A More Synchronous Way to Write Async Code
+
+`Async/Await` is syntactic sugar built on top of Promises, providing a more intuitive way to handle asynchronous operations:
+
+- **Synchronous style**: Makes asynchronous code look like synchronous code
+- **Error handling**: Use `try/catch` for handling errors
+- **Easier debugging**: Debug line by line like synchronous code
+- **Conditional logic**: Simplifies complex control flow
+
+```jsx
+async function fetchUserData() {
+  try {
+    const response = await fetch('/api/user');
+    const userData = await response.json();
+    return userData;
+  } catch (error) {
+    console.error('An error occurred', error);
+    throw error;
+  }
+}
+```
+
+### **How does async/await relate to Promises?**
+
+- `async/await` is syntactic sugar built on top of Promises
+- `async` functions always return a Promise
+- `await` can only be used inside an `async` function
+- `await` can wait on any object with a `.then()` method (thenable)
+
+```jsx
+// async functions always return a Promise
+async function example() {
+  return "Hello";
+}
+
+// Equivalent to
+function example() {
+  return Promise.resolve("Hello");
+}
+
+// Verify async returns a Promise
+console.log(example()); // Promise {<fulfilled>: "Hello"}
+
+// await resolves the value of a Promise
+async function runExample() {
+  const result = await example();
+  console.log(result); // "Hello"
+
+  // Equivalent to
+  example().then(value => console.log(value));
+}
+```
+
+**Comparison: Promise vs Async/Await**
+
+```jsx
+// Using Promise
+function fetchData() {
+  return fetch('/api/data')
+    .then(response => response.json())
+    .then(data => data)
+    .catch(error => console.error(error));
+}
+
+// Using async/await (more readable)
+async function fetchData() {
+  try {
+    const response = await fetch('/api/data');
+    const data = await response.json();
+    return data; // implicitly wrapped in Promise.resolve(data)
+  } catch (error) {
+    console.error(error);
+  }
+}
+```
+
+### Comparison Overview
+
+| Approach | Readability | Error Handling | Debugging |
+| --- | --- | --- | --- |
+| Callback | Poor | Multiple callbacks | Difficult |
+| Promise | Moderate | `.catch()` | Moderate |
+| Async/Await | Excellent | `try/catch` | Easy |
+
+---
+
+![image](/blog/js-promise/image-1.png)
+
+### 5. Understanding Promise Static Methods
+
+| Method | Purpose | Behavior on Failure | Recommended Use Case |
+| --- | --- | --- | --- |
+| **Promise.all()** | Run multiple Promises in parallel | Fails immediately if any fails | Fetch multiple resources (e.g., users + posts) |
+| **Promise.race()** | Resolves/rejects with the first settled Promise | Whichever settles first (success or failure) | Implement request timeouts |
+| **Promise.any()** | Resolves with the first fulfilled Promise | Rejects only if all fail | Fallback across multiple APIs |
+| **Promise.allSettled()** | Waits for all Promises to settle | Always resolves | When you need all results regardless of outcome |
+
+**Example:**
+
+```jsx
+// Fetch users and posts in parallel
+Promise.all([
+  fetch('/api/users'),
+  fetch('/api/posts')
+]).then(([users, posts]) => { /* handle data */ });
+
+// Set a 5-second timeout
+Promise.race([
+  fetch('/api/data'),
+  new Promise((_, reject) => setTimeout(() => reject('Timeout'), 5000))
+]);
+```
+
+---
+
+![image](/blog/js-promise/image-2.png)
+
+### 6. Differences Between Promise.all and Promise.race (Common Interview Topic)
+
+| Feature | Promise.all | Promise.race |
+| --- | --- | --- |
+| Completion Condition | All Promises must complete | Resolves when any Promise settles |
+| Failure Behavior | Fails if any Promise is rejected | Returns the first settled result (success or failure) |
+| Return Value | An array of all resolved values | The first settled value |
+
+---
+
+### 7. Implementing Promise.all Manually
+
+```jsx
+function promiseAll(promises) {
+  // Return a new Promise (mimicking Promise.all behavior)
+  return new Promise((resolve, reject) => {
+
+    const result = [];   // Store resolved values
+    let finished = 0;    // Track number of completed Promises
+
+    // Iterate through each Promise
+    for (let i = 0; i < promises.length; i++) {
+
+      // Ensure each item is treated as a Promise
+      // (non-Promise values will be wrapped)
+      Promise.resolve(promises[i])
+
+        .then(value => {
+          // Store result in the correct order
+          result[i] = value;
+
+          // Increment completed count
+          finished++;
+
+          // If all Promises are completed
+          if (finished === promises.length) {
+            // Resolve with all results
+            resolve(result);
+          }
+        })
+
+        // Reject immediately if any Promise fails
+        .catch(reject);
+    }
+  });
+}
+```
+
+This implementation demonstrates the core concepts of Promises: state management, completion tracking, and error handling.
+
+---
+
+[Promise.all 是什麼？請實現 Promise.all｜ExplainThis](https://www.explainthis.io/zh-hant/swe/javascript-whiteboard-promise-all)
+
+`Promise.all()` runs multiple Promises in parallel and waits for all of them to complete. If any Promise fails, the entire operation fails.
+
+[JavaScript Promise.all(): Aggregate Results from Multiple Promises](https://www.javascripttutorial.net/javascript-promise-all/)
+
+`Promise.race` returns the result of the first settled Promise, regardless of whether it succeeded or failed.
+
+[Learn JavaScript Promise.race() By Practical Examples](https://www.javascripttutorial.net/javascript-promise-race/)
+
+`Promise.any` returns the first **fulfilled** Promise result, and only rejects if all Promises fail.
+
+[JavaScript Promise.any](https://www.javascripttutorial.net/javascript-promise-any/)
+
+`Promise.allSettled()` waits for all Promises to settle and returns the result status of each one.
+
+[JavaScript Promise.allSettled() Method](https://www.javascripttutorial.net/javascript-promise-allsettled/)

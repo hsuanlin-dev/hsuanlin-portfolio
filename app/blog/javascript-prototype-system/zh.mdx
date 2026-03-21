@@ -1,23 +1,244 @@
+# JavaScript 原型系統與 ES6 Class
+
+### **JavaScript 原型系統與 ES6 Class：從「找爸爸翻寶箱」到語法糖完整解析**
 
 ---
-title: JavaScript 原型系統
-description: 原型系統文章的暫時內容。
+
+### 1. 原型系統的核心概念（家族比喻）
+
+JavaScript 使用**原型繼承（Prototypal Inheritance）**來實現物件共享，而不是傳統語言的「複製一份」。
+
+- **原型 (Prototype)**：就像「爸爸的技能包」
+- **原型繼承**：你不需要自己重新打造一套工具，只要你是爸爸的小孩，就能直接去他房間拿工具
+- **原型鏈 (Prototype Chain)**：當你不會某項技能時，就翻家譜往上找——問爸爸 → 問爺爺 → … 直到 `null`
+
+**小結**
+原型 = 你的「長輩」
+原型繼承 = 「我有權力使用長輩的東西」
+原型鏈 = 「從自己開始，沿血緣一路向上找」的過程
+
 ---
 
-# JavaScript 原型系統
+### 2. 三個容易混淆的「原型」標籤
 
-這是一篇 **測試用文章**，之後會再補上完整解說。
+| 術語 | 誰擁有 | 它是什麼 | 比喻 |
+| --- | --- | --- | --- |
+| `[[Prototype]]` | 每個物件 | 內部的隱藏連結（DNA） | 身分證上的父親名字（隱藏的） |
+| `__proto__` | 每個物件 | 存取原型的公開管道 | 口袋裡的「家譜導航儀」 |
+| `prototype` | 只有函式 | 傳給下一代的技能寶箱 | 爸爸準備的「遺產箱 / 技能藏寶箱」 |
 
-## 範例
+你的 `__proto__`（導航儀）指向的就是爸爸的 `prototype`（技能寶箱），而這整條關係記錄在你的 `[[Prototype]]` 裡。
 
-```javascript
-function Person(name) {
-  this.name = name
+---
+
+### 3. 實際程式碼示範（父子傳承）
+
+```jsx
+// 1. 爸爸（構造函式）
+function Father() {}
+
+// 2. 爸爸把傳家寶放進技能寶箱
+Father.prototype.treasure = "黃金萬兩";
+
+// 3. 生出兒子
+const son = new Father();
+
+// 驗證
+console.log(son.__proto__ === Father.prototype);     // true
+console.log(son.treasure);                           // "黃金萬兩"（沿原型鏈找到）
+console.log(son.__proto__.__proto__.__proto__);      // null（鏈的盡頭）
+```
+
+### 3.1 new 運作四步驟（背後到底發生什麼？）
+
+當我們寫 `const son = new Father();` 時，JavaScript 會偷偷執行以下**四個步驟**：
+
+1. **創建一個新的空物件**
+就像生出一個「新生兒」，什麼都還沒有。
+2. **將這個新物件的原型（[[Prototype]]）連結到構造函式的 prototype**
+也就是把新生兒的「家譜導航儀」直接指向爸爸的「技能寶箱」：
+`son.__proto__ === Father.prototype`（這一步最關鍵，建立了原型鏈！）
+3. **將構造函式內的 this 綁定到這個新物件**
+爸爸開始教小孩：`this.name = ...` 其實就是在新生兒自己身上寫屬性。
+4. **執行構造函式內的程式碼**
+如果構造函式沒有明確 `return` 一個物件，則自動返回這個新物件；若 `return` 了物件，則以該物件為準（通常我們不要這樣寫）。
+
+手動實作 `new`（加分題 💡）：
+
+```jsx
+function myNew(Constructor, ...args) {
+  // 步驟 1：創建空物件 + 步驟 2：連結原型
+  const obj = Object.create(Constructor.prototype);
+
+  // 步驟 3：綁定 this 並執行函式
+  const result = Constructor.apply(obj, args);
+
+  // 步驟 4：返回物件（若構造函式 return 物件則用它）
+  return result instanceof Object ? result : obj;
 }
 
-Person.prototype.sayHello = function () {
-  console.log("Hello " + this.name)
+const son2 = myNew(Father);
+console.log(son2.__proto__ === Father.prototype); // true
+```
+
+這四步驟完美解釋了為什麼 `new` 出來的實例能自動沿原型鏈找到爸爸的技能。
+
+---
+
+### 4. 屬性遮蔽（Property Shadowing）與讀寫不對稱
+
+**比喻**：
+讀取時 → 你沒錢就去翻爸爸的錢包（沿原型鏈找）
+設定時 → 你自己賺了錢，就放在自己的口袋，不會塞進爸爸的錢包
+
+```jsx
+son.treasure = "我自己的小錢包";
+
+console.log(son.treasure);               // "我自己的小錢包"（自己的口袋優先）
+console.log(Father.prototype.treasure);  // "黃金萬兩"（爸爸的還在！）
+
+delete son.treasure;
+console.log(son.treasure);               // "黃金萬兩"（又翻回爸爸的）
+```
+
+**真正想改全家遺產（敗家子操作）**
+必須直接動爸爸的寶箱：
+
+```jsx
+Father.prototype.treasure = "空空如也";
+// 或
+son.__proto__.treasure = "被我變賣了";
+```
+
+**工程師提醒**：直接改 `Array.prototype` 或 `Object.prototype` 會造成「原型污染」，就像修改了全人類的 DNA，生產環境絕對避免。
+
+---
+
+### 5. ES6 Class：包裝過的原型機制（語法糖）
+
+雖然語法變漂亮了，但請記住：**class 只是把「找爸爸翻寶箱」的複雜過程，包裝成看起來很專業、很整齊的寫法**。底層運行的依然是那一套原型鏈機制。這只是所謂的「語法糖（Syntactic Sugar）」。
+
+### 5.1 傳統寫法 vs. Class 寫法
+
+```jsx
+// 傳統「找爸爸」寫法
+function Father() {}
+Father.prototype.treasure = "黃金萬兩";
+Father.prototype.sayHi = function() {
+  console.log("孩子，你好");
+};
+const son = new Father();
+```
+
+```jsx
+// 現代 class 寫法
+class Father {
+  constructor() {
+    // 這裡放「每個人口袋裡都有」的東西
+  }
+  sayHi() {                     // 自動放進 Father.prototype 寶箱
+    console.log("孩子，你好");
+  }
+}
+Father.prototype.treasure = "黃金萬兩";  // 靜態屬性仍可混用
+const son = new Father();
+```
+
+### 5.2 繼承時的 extends 與 super
+
+```jsx
+class Son extends Father {
+  constructor() {
+    super();                    // 必需！打電話給爸爸，繼承血統
+    this.pocketMoney = 100;
+  }
+  sayHi() {                     // 遮蔽爸爸的方法
+    console.log("喔！我是兒子！");
+  }
+}
+const me = new Son();
+```
+
+### 5.3 底層發生了什麼事？（關鍵拆解）
+
+當你寫 `class Son extends Father` 時，JavaScript 在背後偷偷做了：
+
+1. 自動設定 `Son.prototype.__proto__ = Father.prototype`（串好原型鏈）
+2. `super()` 確保爸爸的構造函式先執行一次
+3. class 內的方法自動放進 `prototype` 寶箱（不複製到每個實例）
+
+**最終驗證**（即使寫 class 也能看到原型鏈）：
+
+```jsx
+console.log(me.__proto__ === Son.prototype);                // true
+console.log(Son.prototype.__proto__ === Father.prototype);  // true
+```
+
+---
+
+### 5.4 完整程式碼比較（Class vs Function + 私有成員）
+
+**Class 寫法（現代，含原生私有欄位）**
+
+```jsx
+class Person {
+  #privateField = '私有';   // 真正語言層級私有，外部無法直接存取
+
+  constructor(name, age) {
+    this.name = name;
+    this.age = age;
+  }
+
+  hello() {
+    return `你好，我是 ${this.name}`;
+  }
+
+  getPrivate() {
+    return this.#privateField;
+  }
+
+  static create(name, age) {
+    return new Person(name, age);
+  }
+}
+```
+
+**傳統 Function + 閉包寫法**
+
+```jsx
+function Person(name, age) {
+  this.name = name;
+  this.age = age;
+
+  // 閉包模擬私有變數
+  let privateField = 'private';
+
+  this.getPrivate = function() {
+    return privateField;
+  };
 }
 
-const user = new Person("Alex")
-user.sayHello()
+Person.prototype.hello = function() {
+  return `Hello, my name is ${this.name}`;
+};
+
+Person.create = function(name, age) {
+  return new Person(name, age);
+};
+```
+
+**比較重點**
+
+- `#privateField`：真正私有，連繼承類都無法直接讀寫
+- 閉包私有：相容舊環境，但每次實例都會產生新閉包
+- 兩種寫法最終原型鏈完全相同：實例的 `__proto__` 指向 `Person.prototype`
+
+---
+
+### 6. 總結（三句話記住原型系統）
+
+1. `prototype` 是爸爸的寶箱（定義共享規則的地方）
+2. `__proto__` 是你的導航儀（找爸爸的路徑）
+3. `[[Prototype]]` 是內部家譜記錄（真正的血脈連結）
+
+ES6 `class` 只是外殼，讓程式碼更現代、更像傳統 OOP，但本質依然是那套「翻家譜找寶箱」的原型鏈。加上 `new` 的四步驟後，你已經能完整解釋從創建實例到繼承的整個流程了！
