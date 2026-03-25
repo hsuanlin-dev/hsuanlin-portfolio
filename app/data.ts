@@ -124,19 +124,37 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
     roles: [
       {
         title: {
-          en: 'Design Engineer',
-          zh: '設計工程師',
+          en: 'Senior UI Developer & Designer',
+          zh: '資深 UI 開發工程師與設計師',
         },
         start: '2023',
         end: 'Present',
         highlights: {
           en: [
-            'Designed and implemented user-facing features with a strong focus on usability and cross-team collaboration.',
-            'Partnered closely with designers and backend engineers to build scalable, maintainable frontend solutions.',
+            'Led a 5-member team for TaipeiPASS ecosystem, ensuring A11y AA standards.',
+            'Architected a scalable React component library to standardize UI across national agencies.',
           ],
           zh: [
-            '設計並實作面向使用者的產品功能，重視易用性與跨團隊協作。',
-            '與設計師及後端工程師緊密合作，打造可擴充且易維護的前端解決方案。',
+            '帶領 5 人團隊主導台北通數位系統，落實 A11y AA 無障礙標準。',
+            '為國家機關架構可擴充的 React 組件庫，實現跨單位 UI 標準化。',
+          ],
+        },
+      },
+      {
+        title: {
+          en: 'Front End Developer',
+          zh: '前端網頁工程師',
+        },
+        start: '2021',
+        end: '2023',
+        highlights: {
+          en: [
+            'Modernized cross-agency platforms using structured SCSS and ES6+ architecture.',
+            'Refactored data-heavy administrative interfaces to ensure robust frontend logic.',
+          ],
+          zh: [
+            '運用結構化 SCSS 與 ES6+ 架構，推動跨部會平台現代化。',
+            '重構高複雜度的數據管理介面，提升前端邏輯穩定性與維護效率。',
           ],
         },
       },
@@ -146,15 +164,15 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
           zh: '全端工程師',
         },
         start: '2020',
-        end: '2023',
+        end: '2021',
         highlights: {
           en: [
-            'Developed and maintained full-stack web applications for enterprise clients.',
-            'Enhanced system performance and code quality through refactoring, testing strategies, and peer code reviews.',
+            'Engineered APEWS portal, a unified gateway for 10+ mission-critical subsystems.',
+            'Designed "zero-scroll" high-density dashboards leveraging Google Maps and Chart.js.',
           ],
           zh: [
-            '為企業客戶開發並維護全端網頁應用系統。',
-            '透過重構、測試策略與同儕程式碼審查，提升系統效能與程式碼品質。',
+            '開發 APEWS 門戶系統，統一整合 10 個以上國家級關鍵子系統。',
+            '利用 Maps 與 Chart.js 設計零捲動高密度即時監控儀表板。',
           ],
         },
       },
