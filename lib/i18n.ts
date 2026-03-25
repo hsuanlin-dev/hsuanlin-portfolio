@@ -1,9 +1,9 @@
 export const text = {
   en: {
-    heroTitle: 'Senior Frontend Design Engineer',
-    heroSubtitle: '5+ years crafting performant, interactive web experiences.',
+    heroTitle: 'Senior UI Developer & Designer',
+    heroSubtitle: '6+ years crafting high-fidelity, scalable digital ecosystems.',
     heroDescription:
-      'Passionate about turning design intuition into clean, scalable code — delivering intuitive, fast, and accessible user interfaces.',
+      'Fusing design vision from Parsons with the rigor of Computer Science, I specialize in translating intuition into high-performance code, crafting digital experiences that are seamless, fast, and accessible.',
 
     skills: 'Skills',
     projects: 'Selected Projects',
@@ -18,10 +18,10 @@ export const text = {
   },
 
   zh: {
-    heroTitle: '資深前端設計工程師',
-    heroSubtitle: '擁有 5 年以上打造高效能互動式網頁體驗的經驗。',
+    heroTitle: '資深設計工程師',
+    heroSubtitle: '具備 6 年以上實務經驗，擅長開發高品質且易於擴展的數位生態系統 。',
     heroDescription:
-      '熱衷於將設計直覺轉化為乾淨、可擴充的程式碼，打造直覺、快速且具備無障礙體驗的使用者介面。',
+      '融合 Parsons 的設計視野與資訊工程的嚴謹邏輯，我專注於將設計直覺轉化為高品質代碼，打造兼具流暢感與無障礙標準的數位體驗。',
 
     skills: '技能',
     projects: '精選專案',
