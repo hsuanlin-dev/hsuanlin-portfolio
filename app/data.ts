@@ -53,28 +53,36 @@ type SocialLink = {
   download?: boolean
 }
 
-export const SKILLS: string[] = [
-  'JavaScript (ES6+)',
-  'React',
-  'Semantic HTML5',
-  'SASS · CSS Architecture',
-  'Pixel-perfect UI',
-  'Design Systems',
-  'A11y (AA Standards)',
-  'UI/UX Design',
-  'Figma',
-  'Next.js',
-  'TypeScript',
-  'Tailwind CSS',
-  'Performance Optimization',
+export type SkillGroup = {
+  category: string
+  items: string[]
+}
+
+export const SKILLS: SkillGroup[] = [
+  {
+    category: 'Core Tech',
+    items: ['JavaScript (ES6+)', 'React', 'Semantic HTML5', 'SASS · CSS Architecture'],
+  },
+  {
+    category: 'Design',
+    items: ['Design Systems', 'UI/UX Design', 'Pixel-perfect UI', 'Figma', 'A11y (WCAG 2.1 AA)'],
+  },
+  {
+    category: 'Engineering & Tooling',
+    items: ['TypeScript', 'NPM', 'Git', 'Tailwind CSS', 'Webpack', 'Vite'],
+  },
+  {
+    category: 'AI Development Tools',
+    items: ['Claude Code', 'Cursor'],
+  },
 ]
 
 export const PROJECTS: Project[] = [
     {
     name: 'TaipeiPASS — Taipei City Digital Ecosystem',
     description: {
-      en: 'Redefining the city’s digital gateway through universal accessibility and pixel-perfect visual excellence.',
-      zh: '透過全民無障礙與像素級的視覺精準度，重新定義城市的數位入口。',
+      en: "Frontend lead for Taipei City Government’s TaipeiPASS platform, built to WCAG 2.1 AA standards.",
+      zh: '負責台北市政府 TaipeiPASS 平台的前端開發，落實 WCAG 2.1 AA 無障礙標準。',
     },
     // link: 'https://id.taipei/tpcd/',
     link: '/project/taipei-pass',
@@ -84,8 +92,8 @@ export const PROJECTS: Project[] = [
   {
     name: 'National Park Service — Standardized UI Framework',
     description: {
-      en: 'Harmonizing national digital identity with a scalable React framework built for long-term cohesion.',
-      zh: '透過具備擴充性的 React 架構，讓國家級數位識別達成視覺和諧。',
+      en: 'Shared React component library adopted across the NPS portal and 2+ other government platforms.',
+      zh: '打造可共用的 React 元件庫，目前已用於國家公園入口網站及 2 個以上相關平台。',
     },
     // link: 'https://www.nps.gov.tw/ch',
     link: '/project/national-park-service',
@@ -95,8 +103,8 @@ export const PROJECTS: Project[] = [
   {
     name: 'Indigenous Carbon Sink — ESG Matchmaking Platform',
     description: {
-      en: 'Bridging indigenous cultural storytelling with modern web engineering to drive sustainable impact.',
-      zh: '連結原民文化敘事與現代網頁工程，推動永續轉型的影響力。',
+      en: "Sole contributor for the platform's visual layer, built with a custom SCSS architecture.",
+      zh: '獨立負責平台的整套視覺層，採用自訂 SCSS 架構完成開發。',
     },
     // link: 'https://csp-tradevan.com.tw/ESG/Formosa',
     link: '/project/indigenous-carbon-sink',
@@ -106,8 +114,8 @@ export const PROJECTS: Project[] = [
   {
     name: 'EZSIGN — B2B Digital Signature Experience',
     description: {
-      en: 'Evolving complex B2B workflows into intuitive, trust-driven digital journeys through human-centric design.',
-      zh: '透過以人為本的設計，將複雜的商業流程轉化為直覺且具信任感的數位旅程。',
+      en: "Multi-step Wizard workflow and landing page for EZSIGN's B2B onboarding, built with Bootstrap.",
+      zh: '為 EZSIGN 的 B2B 設計整體視覺呈現與 UX flow，以多步驟 Wizard 簡化複雜的法律簽署流程。',
     },
     // link: 'https://ezsign.tradevan.com.tw/APESP/',
     link: '/project/ezsign',
@@ -124,37 +132,41 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
     roles: [
       {
         title: {
-          en: 'Senior UI Developer & Designer',
-          zh: '資深 UI 開發工程師與設計師',
+          en: 'Senior Frontend Engineer',
+          zh: '資深前端工程師',
         },
-        start: '2023',
+        start: '03/2023',
         end: 'Present',
         highlights: {
           en: [
-            'Led a 5-member team for TaipeiPASS ecosystem, ensuring A11y AA standards.',
-            'Architected a scalable React component library to standardize UI across national agencies.',
+            'Served as frontend lead on a 5-person team building the TaipeiPASS digital platform for Taipei City Government, owning UI implementation and enforcing WCAG 2.1 AA accessibility standards across the frontend layer.',
+            'Extended and maintained a shared React component library — adopted across the National Park Service portal and 2+ additional government platforms — standardizing UI patterns to reduce redundant implementation and maintain visual consistency at scale.',
+            'Designed and built the full visual layer of the Indigenous Carbon Sink ESG platform as a sole contributor, implementing a custom SCSS architecture with a defined color system and responsive layout.',
+            'Implemented a multi-step Wizard workflow and landing page for EZSIGN\'s B2B onboarding using Bootstrap, simplifying a complex legal signing process into a guided, high-contrast UI flow.',
           ],
           zh: [
-            '帶領 5 人團隊主導台北通數位系統，落實 A11y AA 無障礙標準。',
-            '為國家機關架構可擴充的 React 組件庫，實現跨單位 UI 標準化。',
+            '擔任 5 人團隊的前端負責人，打造台北市政府的 TaipeiPASS 數位平台，負責 UI 實作並在前端層全面落實 WCAG 2.1 AA 無障礙標準。',
+            '擴充並維護共用的 React 元件庫，已被國家公園入口網站及 2 個以上其相關平台採用，統一 UI 模式以減少重複開發、維持大規模視覺一致性。',
+            '作為唯一負責人，設計並打造原住民碳匯 ESG 平台的整套視覺層，建立自訂 SCSS 架構，包含色彩系統與響應式版面。',
+            '使用 Bootstrap 為 EZSIGN 的 B2B 導入流程實作多步驟 Wizard 流程與 landing page，將複雜的法律簽署流程簡化為引導式、高對比的 UI 流程。',
           ],
         },
       },
       {
         title: {
-          en: 'Front End Developer',
-          zh: '前端網頁工程師',
+          en: 'Frontend Engineer',
+          zh: '前端工程師',
         },
-        start: '2021',
-        end: '2023',
+        start: '03/2021',
+        end: '03/2023',
         highlights: {
           en: [
-            'Modernized cross-agency platforms using structured SCSS and ES6+ architecture.',
-            'Refactored data-heavy administrative interfaces to ensure robust frontend logic.',
+            'Refactored the ECAR cross-agency vehicle platform and NSRRC research portal from legacy markup to a structured SCSS + ES6+ architecture, including complex multi-step forms with dynamic field logic and data-heavy admin interfaces.',
+            'Established a unified visual style guide and component conventions for both platforms, working directly with internal users to align the UI with existing government workflows.',
           ],
           zh: [
-            '運用結構化 SCSS 與 ES6+ 架構，推動跨部會平台現代化。',
-            '重構高複雜度的數據管理介面，提升前端邏輯穩定性與維護效率。',
+            '將 ECAR 跨機關車輛平台與 NSRRC 研究入口網站從舊有 markup 重構為結構化的 SCSS + ES6+ 架構，包含具動態欄位邏輯的多步驟表單與資料密集的後台介面。',
+            '為兩個平台建立統一的視覺風格指南與元件規範，並直接與內部使用者協作，讓 UI 對齊既有的政府作業流程。',
           ],
         },
       },
@@ -163,16 +175,18 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
           en: 'Full Stack Developer',
           zh: '全端工程師',
         },
-        start: '2020',
-        end: '2021',
+        start: '03/2020',
+        end: '03/2021',
         highlights: {
           en: [
-            'Engineered APEWS portal, a unified gateway for 10+ mission-critical subsystems.',
-            'Designed "zero-scroll" high-density dashboards leveraging Google Maps and Chart.js.',
+            'Built the APEWS portal, a centralized entry point providing unified access and consistent UI across 10+ independent IoT surveillance subsystems, with shared visual styles and cross-system SSO navigation.',
+            'Built a real-time visualization dashboard integrating Google Maps API and Chart.js to display live container tracking states across 10+ interconnected subsystems, designed under a zero-scroll high-density layout constraint.',
+            'Developed the data layer using Java Spring MVC and SQL to support high-concurrency container tracking, ensuring consistent state between backend and the frontend visualization layer.',
           ],
           zh: [
-            '開發 APEWS 門戶系統，統一整合 10 個以上國家級關鍵子系統。',
-            '利用 Maps 與 Chart.js 設計零捲動高密度即時監控儀表板。',
+            '打造 APEWS 入口網站，作為串接 10 個以上獨立 IoT 監控子系統的單一入口，提供統一的存取方式與一致的 UI，並具備跨系統 SSO 導覽與共用視覺風格。',
+            '打造整合 Google Maps API 與 Chart.js 的即時視覺化儀表板，在零捲動、高密度版面的限制下，顯示橫跨 10 個以上子系統的即時貨櫃追蹤狀態。',
+            '使用 Java Spring MVC 與 SQL 開發資料層，支援高併發的貨櫃追蹤需求，確保後端與前端視覺化層之間的狀態一致。',
           ],
         },
       },

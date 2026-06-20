@@ -1,9 +1,9 @@
 export const text = {
   en: {
-    heroTitle: 'Senior UI Developer & Designer',
-    heroSubtitle: '6+ years crafting high-fidelity, scalable digital ecosystems.',
+    heroTitle: '',
+    heroSubtitle: '',
     heroDescription:
-      'Fusing design vision from Parsons with the rigor of Computer Science, I specialize in translating intuition into high-performance code, crafting digital experiences that are seamless, fast, and accessible.',
+      'Frontend Engineer with 6+ years of experience and an MFA in Design & Technology from Parsons. Specialized in building modular React component systems and translating complex design requirements into production-ready UI — with hands-on experience in accessible, enterprise-scale platforms. Integrates AI development tools (Claude Code, Cursor) into daily engineering workflow.',
 
     skills: 'Skills',
     projects: 'Selected Projects',
@@ -18,10 +18,10 @@ export const text = {
   },
 
   zh: {
-    heroTitle: '資深設計工程師',
-    heroSubtitle: '具備 6 年以上實務經驗，擅長開發高品質且易於擴展的數位生態系統 。',
+    heroTitle: '',
+    heroSubtitle: '',
     heroDescription:
-      '融合 Parsons 的設計視野與資訊工程的嚴謹邏輯，我專注於將設計直覺轉化為高品質代碼，打造兼具流暢感與無障礙標準的數位體驗。',
+      '擁有 6 年以上經驗的前端工程師，畢業於 Parsons 設計與科技碩士。專長為打造模組化的 React 元件系統，並將複雜的設計需求轉化為可上線的 UI，具備無障礙設計與企業級平台的實作經驗。日常開發流程中整合 AI 開發工具（Claude Code、Cursor）。',
 
     skills: '技能',
     projects: '精選專案',

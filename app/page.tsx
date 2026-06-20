@@ -182,8 +182,8 @@ export default function Personal() {
       >
         <div className="flex-1">
           <p className="text-zinc-600 dark:text-zinc-400">
-            {text[lang].heroTitle}<br></br>
-            {text[lang].heroSubtitle}<br></br>
+            {text[lang].heroTitle && <>{text[lang].heroTitle}<br /></>}
+            {text[lang].heroSubtitle && <>{text[lang].heroSubtitle}<br /></>}
             {text[lang].heroDescription}
           </p>
         </div>
@@ -197,23 +197,32 @@ export default function Personal() {
           {text[lang].skills}
         </h3>
 
-        <div className="flex flex-wrap gap-2">
-          {SKILLS.map((skill) => (
-            <span
-              key={skill}
-              className="
-                inline-flex items-center rounded-full
-                border border-zinc-200 bg-white
-                px-4 py-1.5
-                text-sm font-medium text-zinc-700
-                shadow-sm
-                transition-colors
-                hover:bg-zinc-50
-                dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300
-              "
-            >
-              {skill}
-            </span>
+        <div className="space-y-4">
+          {SKILLS.map((group) => (
+            <div key={group.category}>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                {group.category}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {group.items.map((skill) => (
+                  <span
+                    key={skill}
+                    className="
+                      inline-flex items-center rounded-full
+                      border border-zinc-200 bg-white
+                      px-4 py-1.5
+                      text-sm font-medium text-zinc-700
+                      shadow-sm
+                      transition-colors
+                      hover:bg-zinc-50
+                      dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300
+                    "
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </motion.section>
@@ -280,7 +289,7 @@ export default function Personal() {
 
                   {/* Company + roles */}
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-base font-[450] text-zinc-900 dark:text-zinc-50">
+                    <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
                       {job.company}
                     </h4>
 
@@ -288,7 +297,7 @@ export default function Personal() {
                       {job.roles.map((role, idx) => (
                         <div key={idx}>
                           <div className="flex items-start justify-between gap-4">
-                            <h5 className="text-base font-normal text-zinc-600 dark:text-zinc-400">
+                            <h5 className="text-base font-medium text-zinc-800 dark:text-zinc-200">
                               {role.title[lang]}
                             </h5>
                             <p className="shrink-0 text-base text-zinc-500 leading-relaxed dark:text-zinc-400">
@@ -343,13 +352,13 @@ export default function Personal() {
 
                   {/* Content */}
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-base font-[450] text-zinc-900 dark:text-zinc-50">
+                    <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
                       {school.school}
                     </h4>
 
                     <div className="mt-4">
                       <div className="flex items-start justify-between gap-4">
-                        <p className="text-base font-normal text-zinc-600 dark:text-zinc-400">
+                        <p className="text-base font-medium text-zinc-600 dark:text-zinc-400">
                           {school.title[lang]}
                         </p>
                         <p className="shrink-0 text-base text-zinc-500 leading-relaxed dark:text-zinc-400">
