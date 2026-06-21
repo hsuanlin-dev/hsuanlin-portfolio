@@ -92,8 +92,8 @@ export const PROJECTS: Project[] = [
   {
     name: 'National Park Service — Standardized UI Framework',
     description: {
-      en: 'Shared React component library adopted across the NPS portal and 2+ other government platforms.',
-      zh: '打造可共用的 React 元件庫，目前已用於國家公園入口網站及 2 個以上相關平台。',
+      en: "Rebuilt two government platforms to match the National Park Service portal's UI system, without sharing a codebase.",
+      zh: '參照國家公園入口網的 UI 規範，獨立重建兩個政府平台的前端，未共用程式碼。',
     },
     // link: 'https://www.nps.gov.tw/ch',
     link: '/project/national-park-service',
@@ -140,13 +140,13 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
         highlights: {
           en: [
             'Served as frontend lead on a 5-person team building the TaipeiPASS digital platform for Taipei City Government, owning UI implementation and enforcing WCAG 2.1 AA accessibility standards across the frontend layer.',
-            'Extended and maintained a shared React component library — adopted across the National Park Service portal and 2+ additional government platforms — standardizing UI patterns to reduce redundant implementation and maintain visual consistency at scale.',
+            'Rebuilt the frontends of two internal government platforms from legacy code, independently replicating the UI specification and component conventions of the National Park Service portal to maintain visual consistency without a shared codebase.',
             'Designed and built the full visual layer of the Indigenous Carbon Sink ESG platform as a sole contributor, implementing a custom SCSS architecture with a defined color system and responsive layout.',
             'Implemented a multi-step Wizard workflow and landing page for EZSIGN\'s B2B onboarding using Bootstrap, simplifying a complex legal signing process into a guided, high-contrast UI flow.',
           ],
           zh: [
             '擔任 5 人團隊的前端負責人，打造台北市政府的 TaipeiPASS 數位平台，負責 UI 實作並在前端層全面落實 WCAG 2.1 AA 無障礙標準。',
-            '擴充並維護共用的 React 元件庫，已被國家公園入口網站及 2 個以上其相關平台採用，統一 UI 模式以減少重複開發、維持大規模視覺一致性。',
+            '在沒有共用程式碼的情況下，參照國家公園入口網的 UI 規範與元件慣例，獨立重建另外兩個政府平台的前端，維持視覺一致性。',
             '作為唯一負責人，設計並打造原住民碳匯 ESG 平台的整套視覺層，建立自訂 SCSS 架構，包含色彩系統與響應式版面。',
             '使用 Bootstrap 為 EZSIGN 的 B2B 導入流程實作多步驟 Wizard 流程與 landing page，將複雜的法律簽署流程簡化為引導式、高對比的 UI 流程。',
           ],
