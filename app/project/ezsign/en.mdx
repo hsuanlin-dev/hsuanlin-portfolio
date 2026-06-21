@@ -1,45 +1,22 @@
 # EZSIGN — B2B Digital Signature Experience
 
-I orchestrated the UI/UX strategy and frontend implementation for **EZSIGN**, a high-stakes B2B digital signature platform. By leveraging **Bootstrap 5** as a robust responsive engine, I focused on humanizing complex legal workflows into high-conversion digital journeys.
-
 ![image](/ezsign.png)
 > **Project Link:** [https://ezsign.tradevan.com.tw/APESP/](https://ezsign.tradevan.com.tw/APESP/) ↗
 
-## Project Overview
+## Overview
 
-EZSIGN is a **B2B digital signature platform** designed to simplify critical legal transactions for enterprise users. The project demanded a careful balance between strict legal compliance, visual trustworthiness, and seamless cross-browser reliability across diverse enterprise environments.
+I owned the frontend visual implementation for EZSIGN, a B2B digital signature platform — including a multi-step Wizard workflow and a landing page for the onboarding flow. The underlying business logic and functionality were handled by other engineers on the team.
 
-Core responsibilities include:
+## Challenge
 
-- Leading the full UI/UX strategy and frontend implementation
-- Re-architecting the UI system through deep Bootstrap 5 SCSS customization
-- Designing a Wizard-based multi-step workflow to reduce user friction
-- Building a modular component library for long-term B2B product scalability
+The signing process couldn't be collapsed into a single form: documents needed uploading, one or more signers had to be configured in a specific order, and notification preferences had to be set. Structuring all of that into a guided flow, without overwhelming the user with one dense form, was the core challenge. The existing tech stack was also a constraint rather than a choice — the project already ran on Bootstrap — and the visual presentation needed a full re-theme to feel trustworthy for a legal process.
 
-## The Challenge
+## What I Did
 
-**The "Legal Anxiety" Barrier:** Traditional B2B signing involves dense forms and technical jargon, leading to high user friction during critical transactions.
+- Built a multi-step Wizard — basic information, document upload, then signer and notification setup — guiding users through the signing flow without overwhelming them
+- Re-themed the platform's visual presentation entirely, reworking the color system within the existing Bootstrap setup
+- Designed and implemented the landing page so visitors could immediately understand what the service does and why to choose Tradevan
 
-**Engineering for Stability:** The challenge was to deliver a custom, high-trust visual experience while ensuring **maximum cross-browser compatibility** and stability across diverse enterprise environments.
+## Outcome
 
-## Strategic Solution
-
-I implemented a **"Human-Centric B2B Strategy"** through a deeply customized architectural approach:
-
-- **Customized Bootstrap Architecture:** Rather than adopting a generic look, I **re-architected the UI system** by extensively overriding **Bootstrap's SCSS variables**. This allowed for a professional "LegalTech" aesthetic while maintaining the framework's enterprise-grade reliability.
-- **Wizard-Based Workflow Design:** I deconstructed complex signing sequences into a multi-step "Wizard" interface. Using **Bootstrap's grid and modal systems**, I reduced cognitive load and guided users through high-stakes tasks with clarity.
-- **Utility-First Customization:** Leveraged Bootstrap's utility-first principles to ensure rapid UI iterations while maintaining a **pixel-perfect design-to-code pipeline**.
-
-## Key Contributions
-
-- **Scalable UI Foundation:** Established a modular component library on top of **Bootstrap**, ensuring low-friction maintenance and consistency across the entire B2B product suite.
-- **Strategic UX Gatekeeping:** Bridged the gap between dense legal requirements and user-centric design, optimizing the flow to reduce user drop-off.
-- **High-Performance Implementation:** Optimized the frontend footprint to ensure that the **Bootstrap-based interface** remains lightweight and responsive, even when handling heavy legal document processing.
-
-## Impact & Results
-
-Through this project, I delivered:
-
-- **Proven Business Conversion:** Transformed a dense legal process into an intuitive journey, demonstrating how **design-driven engineering on a stable framework** can directly impact business operational efficiency.
-- **Enterprise Reliability:** Delivered a rock-solid platform that scales with business needs, setting a quality benchmark for high-trust B2B digital products.
-- **Architectural Mastery:** Proved that deep framework customization — not framework replacement — is often the most strategic path to delivering both speed and quality in enterprise product development.
+The Wizard flow and re-themed interface shipped as part of EZSIGN's B2B onboarding experience. I don't have post-launch metrics to point to, but the goal was clear: make a legally dense, multi-step process feel guided and low-friction at the UI level.
