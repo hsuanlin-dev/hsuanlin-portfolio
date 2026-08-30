@@ -5,18 +5,21 @@
 
 ## Overview
 
-The National Park Service portal runs on a React component library built around an official government UI specification — atomic design principles, with colors and spacing defined as design tokens. Using that portal as my reference, I independently rebuilt the frontends of two other government platforms: a one-stop mountain climbing permit application portal, and an internal land/tax-related system.
+The National Park Service's public portal was built around a React component library based on the government's official UI guidelines. It follows atomic design principles, with colors, spacing, and other visual properties defined as design tokens.
+Using the existing portal as the design reference, I independently rebuilt the frontends for two other government systems: the Taiwan Hiking Permit One-Stop Service Portal and an internal tax-related business system for the National Park Service under the Ministry of the Interior.
 
 ## Challenge
 
-None of these three systems share a single codebase — each lives in its own repo, with its own history. The real challenge was making two completely different legacy frontends look and behave as if they came from the same design system as the National Park portal, without ever touching its actual code, and without any formal documentation to work from.
+The three systems were completely independent, with separate repositories and different development histories.
+The real challenge was making two very different legacy frontends look and behave as though they were built from the same design system as the National Park Service's public portal—without having access to its source code or any formal documentation.
+I had to reverse-engineer the design and implementation patterns from the existing product itself, then apply those patterns consistently to completely separate codebases.
 
 ## What I Did
 
-- Studied the National Park Service portal's existing components and UI specification closely, reverse-engineering its conventions since no formal documentation existed
-- Rebuilt the mountain climbing permit application portal's frontend from scratch, replicating the same component patterns and design tokens
-- Did the same for the internal land/tax-related system, building it independently to match the same visual standard
+- Studied the existing portal's components and UI patterns in detail, reverse-engineering its development conventions without access to formal documentation.
+- Completely rebuilt the frontend of the Taiwan Hiking Permit One-Stop Service Portal, replicating the same component patterns and design tokens.
+- Applied the same approach to the internal tax-related business system for the National Park Service under the Ministry of the Interior, independently rebuilding the frontend and aligning it with the same visual standards.
 
 ## Outcome
 
-Three separate government platforms, each with its own codebase, now look and behave consistently.
+Three independently developed government platforms now share a consistent visual language and interaction experience, despite having separate codebases and development histories.
