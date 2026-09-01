@@ -79,9 +79,9 @@ export const SKILLS: SkillGroup[] = [
 
 export const PROJECTS: Project[] = [
     {
-    name: 'TaipeiPASS — Taipei City Government Digital Services',
+    name: 'TaipeiPASS — Taipei City Government\'s Unified Digital Ecosystem',
     description: {
-      en: "Frontend lead for Taipei City Government’s TaipeiPASS platform, built to WCAG 2.1 AA standards.",
+      en: "Unified the design system and WCAG 2.1 AA accessibility standards across products built on different tech stacks.",
       zh: '負責台北市政府 TaipeiPASS 平台的前端開發，落實 WCAG 2.1 AA 無障礙標準。',
     },
     // link: 'https://id.taipei/tpcd/',
@@ -90,9 +90,9 @@ export const PROJECTS: Project[] = [
     id: 'project1',
   },
   {
-    name: 'National Park Service — Standardized UI Framework',
+    name: 'National Park Service — Scalable UI Framework',
     description: {
-      en: "Rebuilt two government platforms to match the National Park Service portal's UI system, without sharing a codebase.",
+      en: "Reverse-engineered and rebuilt two government platforms to match the National Park Service's design system.",
       zh: '參照國家公園入口網的 UI 規範，獨立重建兩個政府平台的前端，未共用程式碼。',
     },
     // link: 'https://www.nps.gov.tw/ch',
@@ -112,9 +112,9 @@ export const PROJECTS: Project[] = [
     id: 'project3',
   },
   {
-    name: 'EZSIGN — B2B Digital Signature Experience',
+    name: 'EZSIGN — Trust-Driven UI for a B2B Signing Workflow',
     description: {
-      en: "Multi-step Wizard workflow and landing page for EZSIGN's B2B onboarding, built with Bootstrap.",
+      en: "Designed EZSIGN's Wizard onboarding flow and brand identity, including a logo later registered as a trademark.",
       zh: '為 EZSIGN 的 B2B 設計整體視覺呈現與 UX flow，以多步驟 Wizard 簡化複雜的法律簽署流程。',
     },
     // link: 'https://ezsign.tradevan.com.tw/APESP/',
