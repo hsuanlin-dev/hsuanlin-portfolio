@@ -82,7 +82,7 @@ export const PROJECTS: Project[] = [
     name: 'TaipeiPASS — Taipei City Government\'s Unified Digital Ecosystem',
     description: {
       en: "Unified the design system and WCAG 2.1 AA accessibility standards across products built on different tech stacks.",
-      zh: '負責台北市政府 TaipeiPASS 平台的前端開發，落實 WCAG 2.1 AA 無障礙標準。',
+      zh: '在不同技術棧打造的產品之間，統一設計系統與 WCAG 2.1 AA 無障礙標準。',
     },
     // link: 'https://id.taipei/tpcd/',
     link: '/project/taipei-pass',
@@ -93,7 +93,7 @@ export const PROJECTS: Project[] = [
     name: 'National Park Service — Scalable UI Framework',
     description: {
       en: "Reverse-engineered and rebuilt two government platforms to match the National Park Service's design system.",
-      zh: '參照國家公園入口網的 UI 規範，獨立重建兩個政府平台的前端，未共用程式碼。',
+      zh: '逆向解析國家公園入口網的設計系統，據此重建兩個政府平台的前端。',
     },
     // link: 'https://www.nps.gov.tw/ch',
     link: '/project/national-park-service',
@@ -115,7 +115,7 @@ export const PROJECTS: Project[] = [
     name: 'EZSIGN — Trust-Driven UI for a B2B Signing Workflow',
     description: {
       en: "Designed EZSIGN's Wizard onboarding flow and brand identity, including a logo later registered as a trademark.",
-      zh: '為 EZSIGN 的 B2B 設計整體視覺呈現與 UX flow，以多步驟 Wizard 簡化複雜的法律簽署流程。',
+      zh: '設計 EZSIGN 的 Wizard 導入流程與品牌識別，其中 Logo 後續正式註冊為商標。',
     },
     // link: 'https://ezsign.tradevan.com.tw/APESP/',
     link: '/project/ezsign',
