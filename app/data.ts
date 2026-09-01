@@ -79,7 +79,7 @@ export const SKILLS: SkillGroup[] = [
 
 export const PROJECTS: Project[] = [
     {
-    name: 'TaipeiPASS — Taipei City Digital Ecosystem',
+    name: 'TaipeiPASS — Taipei City Government Digital Services',
     description: {
       en: "Frontend lead for Taipei City Government’s TaipeiPASS platform, built to WCAG 2.1 AA standards.",
       zh: '負責台北市政府 TaipeiPASS 平台的前端開發，落實 WCAG 2.1 AA 無障礙標準。',
@@ -139,10 +139,10 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
         end: 'Present',
         highlights: {
           en: [
-            'Served as frontend lead on a 5-person team building the TaipeiPASS digital platform for Taipei City Government, owning UI implementation and enforcing WCAG 2.1 AA accessibility standards across the frontend layer.',
-            'Rebuilt the frontends of two internal government platforms from legacy code, independently replicating the UI specification and component conventions of the National Park Service portal to maintain visual consistency without a shared codebase.',
-            'Designed and built the full visual layer of the Indigenous Carbon Sink ESG platform as a sole contributor, implementing a custom SCSS architecture with a defined color system and responsive layout.',
-            'Implemented a multi-step Wizard workflow and landing page for EZSIGN\'s B2B onboarding using Bootstrap, simplifying a complex legal signing process into a guided, high-contrast UI flow.',
+            'Served as the team\'s primary frontend and accessibility resource across multiple Taipei City Government digital platforms, translating Figma designs into pixel-perfect, WCAG 2.1 AA-compliant interfaces.',
+            'Took ownership of two legacy frontend rebuilds with no formal specifications or documentation, reverse-engineering the National Park Service portal\'s UI conventions to independently reproduce its visual language and component patterns across separate codebases.',
+            'Drove the Indigenous Carbon Sink ESG platform from 0-to-1 as the sole frontend contributor, owning the end-to-end design and frontend implementation—from defining the visual system (SCSS architecture, color system, and responsive layouts) to translating stakeholder requirements into production-ready code.',
+            'Owned EZSIGN\'s visual identity and B2B onboarding experience — designing the logo, color system, and landing page from scratch, then simplifying a complex legal signing process into a guided, trust-focused Wizard flow.',
           ],
           zh: [
             '擔任 5 人團隊的前端負責人，打造台北市政府的 TaipeiPASS 數位平台，負責 UI 實作並在前端層全面落實 WCAG 2.1 AA 無障礙標準。',
@@ -179,7 +179,7 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
         end: '03/2021',
         highlights: {
           en: [
-            'Built the APEWS portal, a centralized entry point providing unified access and consistent UI across 10+ independent IoT surveillance subsystems, with shared visual styles and cross-system SSO navigation.',
+            'Built the APEWS portal — a centralized entry point providing unified access and consistent UI across 10+ independent IoT surveillance subsystems, with shared visual styles and cross-system SSO navigation.',
             'Built a real-time visualization dashboard integrating Google Maps API and Chart.js to display live container tracking states across 10+ interconnected subsystems, designed under a zero-scroll high-density layout constraint.',
             'Developed the data layer using Java Spring MVC and SQL to support high-concurrency container tracking, ensuring consistent state between backend and the frontend visualization layer.',
           ],
