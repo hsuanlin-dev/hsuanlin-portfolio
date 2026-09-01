@@ -165,8 +165,8 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
             'Established a unified visual style guide and component conventions for both platforms, working directly with internal users to align the UI with existing government workflows.',
           ],
           zh: [
-            '將 ECAR 跨機關車輛平台與 NSRRC 研究入口網站從舊有 markup 重構為結構化的 SCSS + ES6+ 架構，包含具動態欄位邏輯的多步驟表單與資料密集的後台介面。',
-            '為兩個平台建立統一的視覺風格指南與元件規範，並直接與內部使用者協作，讓 UI 對齊既有的政府作業流程。',
+            '將 ECAR 跨機關車輛管理平台與 NSRRC 研究入口網站，從舊式 markup 重構為結構化的 SCSS + ES6+ 架構，範圍涵蓋具備動態欄位邏輯的多步驟表單，以及資料密集的後台管理介面。',
+            '為兩個平台建立統一的視覺風格指南與元件規範，並直接與內部使用者溝通協作，讓介面設計貼合既有的政府作業流程。',
           ],
         },
       },
@@ -184,9 +184,9 @@ export const WORK_EXPERIENCE: WorkExperience[] = [
             'Developed the data layer using Java Spring MVC and SQL to support high-concurrency container tracking, ensuring consistent state between backend and the frontend visualization layer.',
           ],
           zh: [
-            '打造 APEWS 入口網站，作為串接 10 個以上獨立 IoT 監控子系統的單一入口，提供統一的存取方式與一致的 UI，並具備跨系統 SSO 導覽與共用視覺風格。',
-            '打造整合 Google Maps API 與 Chart.js 的即時視覺化儀表板，在零捲動、高密度版面的限制下，顯示橫跨 10 個以上子系統的即時貨櫃追蹤狀態。',
-            '使用 Java Spring MVC 與 SQL 開發資料層，支援高併發的貨櫃追蹤需求，確保後端與前端視覺化層之間的狀態一致。',
+            '打造 APEWS 入口網站——作為整合 10 個以上獨立 IoT 監控子系統的單一入口，提供統一的存取方式與一致的介面，並具備共用視覺風格與跨系統 SSO 導覽。',
+            '打造整合 Google Maps API 與 Chart.js 的即時視覺化儀表板，在零捲動、高密度版面的限制下，呈現橫跨 10 個以上互聯子系統的即時貨櫃追蹤狀態。',
+            '使用 Java Spring MVC 與 SQL 開發資料層，支援高併發的貨櫃追蹤需求，確保後端資料與前端視覺化層之間的狀態一致。',
           ],
         },
       },
