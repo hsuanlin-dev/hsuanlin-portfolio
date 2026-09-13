@@ -349,7 +349,7 @@ export const SOCIAL_LINKS: SocialLink[] = [
       en: 'LinkedIn',
       zh: 'LinkedIn',
     },
-    link: 'https://www.linkedin.com/in/hlforge/',
+    link: 'https://www.linkedin.com/in/joeylin-fe/',
   },
   {
     label: {
