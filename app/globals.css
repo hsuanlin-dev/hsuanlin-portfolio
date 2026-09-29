@@ -20,15 +20,37 @@
   }
 }
 
+/*
+ * Sugar High 語法高亮顏色（亮色模式）
+ * 採用 Prism.js 的預設佈景主題色碼——這是目前網路上最常見、
+ * 出現在最多技術部落格 (含 Medium 內嵌程式碼) 的 JS 語法高亮配色，
+ * 刻意只用少數幾種顏色，讓程式碼讀起來跟 Notion 一樣安靜、不花俏。
+ */
 :root {
+  --sh-keyword: #0077aa;   /* const/function/return 等關鍵字：藍色 */
+  --sh-string: #669900;    /* 字串：橄欖綠 */
+  --sh-comment: #708090;   /* 註解：灰色（斜體） */
+  --sh-sign: #999999;      /* 標點符號/運算子：淺灰，退居背景 */
+  --sh-class: #990055;     /* 數字、常數、大寫類別名稱：酒紅色 */
+  --sh-entity: #990055;    /* JSX 標籤名稱：同上 */
+  --sh-property: inherit;  /* .屬性存取：沿用內文顏色，不特別上色 */
+  --sh-jsxliterals: inherit; /* JSX 文字內容：沿用內文顏色 */
+}
+
+/* 暗色模式沿用原本較柔和的 Tokyo Night 配色 */
+.dark {
   --sh-class: #7aa2f7;
   --sh-sign: #89ddff;
   --sh-string: #9ece6a;
   --sh-keyword: #bb9af7;
-  --sh-comment: #565f89;
+  --sh-comment: #71717a;
   --sh-jsxliterals: #7aa2f7;
   --sh-property: #73daca;
   --sh-entity: #e0af68;
+}
+
+.sh__token--comment {
+  font-style: italic;
 }
 
 
@@ -40,15 +62,22 @@
   content: "" !important;
 }
 
-/* 2. 針對程式碼區塊容器 (pre) 的樣式優化 */
+/* 2. 針對程式碼區塊容器 (pre) 的樣式優化：亮色模式採用 Notion 風格的淺灰底 */
 .prose pre {
-  background-color: #161617 !important; /* 調整為更深一點的灰，匹配專業技術部落格底色 */
+  background-color: #f7f6f3 !important;
+  color: #37352f;
   padding: 1.5rem !important;
   border-radius: 0.75rem;
   line-height: 1.6;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   overflow-x: auto;
-  border: 1px solid #2a2a2c; /* 邊框也同步調暗，讓過渡更自然 */
+  border: 1px solid #e5e3df;
+}
+
+.dark .prose pre {
+  background-color: #161617 !important; /* 暗色模式維持原本較深的灰，匹配專業技術部落格底色 */
+  color: #e4e4e7;
+  border-color: #2a2a2c; /* 邊框也同步調暗，讓過渡更自然 */
 }
 
 /* 3. 修正：當 code 在 pre 裡面時，強制背景透明，避免顏色不均 */
@@ -59,19 +88,21 @@
   color: inherit !important;
 }
 
-/* 4. 針對「行內程式碼」(Inline Code) 的獨立樣式 */
+/* 4. 針對「行內程式碼」(Inline Code) 的獨立樣式：亮色模式採用 Notion 風格的淺灰底 + 紅字
+      #eb5757 是從 Notion 實際頁面反解出來的行內程式碼文字顏色 */
 .prose :where(:not(pre) > code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-  background-color: #2a2a2c !important; 
-  color: #e4e4e7;
+  background-color: #f1f0ee !important;
+  color: #eb5757;
   padding: 0.2rem 0.4rem;
   border-radius: 0.4rem;
   font-weight: 500;
 }
 
-/* 5. Sugar High 語法高亮顏色與對比度優化 */
-.sh__token--keyword { color: #ff79c6; }   /* 關鍵字：粉色 */
-.sh__token--string { color: #f1fa8c; }    /* 字串：黃色 */
-/* 註解：使用 Zinc-500 (#71717a)，降低亮度使其具有「註解感」，同時保持可讀性 */
-.sh__token--comment { color: #71717a !important; font-style: italic; } 
-.sh__token--function { color: #50fa7b; }  /* 函數：綠色 */
-.sh__token--variable { color: #8be9fd; }  /* 變數：青色 */
+.dark .prose :where(:not(pre) > code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  /* 半透明灰底：沿用 GitHub Primer (github.com 官方 markdown 樣式) 驗證過的做法，
+     rgba 會疊加在任何底色上都保持一致的可視對比，不用像純色一樣一直手動猜色階 */
+  background-color: rgba(101, 108, 118, 0.2) !important;
+  /* #f85149 是 GitHub Primer 設計系統裡 dark theme 的 fg.danger 紅，
+     經過官方對比度驗證，跟亮色模式的 Notion 紅 #eb5757 同一色系，風格延續 */
+  color: #f85149;
+}
