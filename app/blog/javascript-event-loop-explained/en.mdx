@@ -1,20 +1,6 @@
----
-title: Understanding the JavaScript Event Loop: Microtasks, Macrotasks, and a Kitchen Analogy
-description: A practical guide to understanding the JavaScript Event Loop, microtasks, and macrotasks through a stir-fry restaurant analogy.
-date: 2026-03-20
-published: true
-tags:
-  - JavaScript
-  - Event Loop
-  - Frontend
-  - Node.js
----
-
 # Understanding the JavaScript Event Loop: Microtasks, Macrotasks, and a Kitchen Analogy
 
-## 👨‍🍳 Understanding the JavaScript Event Loop: Microtasks, Macrotasks, and a Kitchen Analogy
-
-### Why Doesn't the Webpage "Freeze"? — The Trade-off Between Synchronous and Asynchronous Execution
+## Why Doesn't the Webpage "Freeze"? — The Trade-off Between Synchronous and Asynchronous Execution
 
 JavaScript is a single-threaded language, meaning that the Call Stack can only execute one task at a time. It does not support parallel execution within the same thread. To prevent the application from being blocked by time-consuming operations—such as API requests or timers—JavaScript relies on asynchronous mechanisms.
 
@@ -25,7 +11,7 @@ Instead of executing these operations on the main thread, they are delegated to 
 
 ---
 
-### **The Event Loop in the Browser**
+## **The Event Loop in the Browser**
 
 In the browser, each iteration of the Event Loop follows this order:
 
@@ -36,7 +22,7 @@ In the browser, each iteration of the Event Loop follows this order:
 
 ---
 
-### **Differences Between the Node.js and Browser Event Loop**
+## **Differences Between the Node.js and Browser Event Loop**
 
 Node.js is built on top of **libuv**. While the overall concept is similar to the browser Event Loop, Node.js divides its loop into six major phases, each containing its own internal execution cycle.
 
@@ -59,7 +45,7 @@ Node.js is built on top of **libuv**. While the overall concept is similar to th
 
 The Event Loop is a core mechanism that ensures the main thread is not blocked by time-consuming operations, allowing web applications to remain responsive and interactive. To better understand this complex scheduling process, we can think of the entire JavaScript runtime as a **"stir-fry restaurant."**
 
-### The Three Core Roles in the Kitchen
+## The Three Core Roles in the Kitchen
 
 The efficiency of this system relies on a clear division of responsibilities:
 
@@ -67,7 +53,7 @@ The efficiency of this system relies on a clear division of responsibilities:
 * **Kitchen Assistants (Web APIs):** Responsible for handling time-consuming tasks, such as timers (`setTimeout`) and network requests (`fetch`). Once a task is completed, the assistant sends a corresponding "ticket" to the queue.
 * **The Dispatcher — Event Loop:** The central coordinator of the system. It continuously checks whether the Call Stack is empty. Once the chef is free, it moves tasks from the queue into the Call Stack in the correct order.
 
-### Understanding the Event Loop Through a Kitchen SOP
+## Understanding the Event Loop Through a Kitchen SOP
 
 This process runs continuously as a loop:
 
@@ -83,35 +69,35 @@ This process runs continuously as a loop:
   After the chef completes that task, the dispatcher returns to **Phase 3** to check for newly added microtasks. This cycle continues indefinitely.
 
 ```
-         [ 1. Chef: Call Stack ]          [ 2. Kitchen Assistants: Web APIs ]
-        +---------------------------+    +-----------------------------------+
-        |  Current Dish (Sync Code) | -->|  ⏱ Timer Countdown (setTimeout)  |
-        |  -----------------------  |    |  🌐 Network Requests (fetch/AJAX) |
-        |  (Stack of Plates: LIFO)  |    |  🖱 Event Listeners (DOM Events)  |
-        +-------------+-------------+    +-------------+--------------------+
-                      |                                |
-        (4) When the chef finishes                     | (3) When tasks finish
-            (Call Stack becomes empty)                 |     send the ticket down
-            the dispatcher steps in                    |
-                      |                                v
-                      |            +----------------------------------------+
-                      |            | [ 3. Dispatcher: Event Loop ] (looping)|
-                      |            | Rules:                                 |
-                      |            | - The Call Stack must be empty         |
-                      |            | - Clear VIP tasks first                |
-                      |            | - Then take one regular task           |
-                      |            +------------------+---------------------+
-                      |                               |
-                      +<------------------------------+
-                      |     Check VIP queue first,
-                      |     otherwise take from regular queue (FIFO)
-                      |
-        +-------------+-------------+   +-------------------------------+
-        |   [ VIP Area ]            |   |   [ Regular Area ]             |
-        |   (Microtask Queue)       |   |   (Task / Macrotask Queue)     |
-        |   - Promise.then()        |   |   - setTimeout callbacks       |
-        |   - async/await resume    |   |   - Click event handlers       |
-        +---------------------------+   +-------------------------------+
+  [ 1. Chef: Call Stack ]          [ 2. Kitchen Assistants: Web APIs ]
++---------------------------+    +-----------------------------------+
+|  Current Dish (Sync Code) | -->|  ⏱ Timer Countdown (setTimeout)   |
+|  -----------------------  |    |  🌐 Network Requests (fetch/AJAX) |
+|  (Stack of Plates: LIFO)  |    |  🖱 Event Listeners (DOM Events)  |
++-------------+-------------+    +-------------+---------------------+
+              |                                |
+(4) When the chef finishes                     | (3) When tasks finish
+    (Call Stack becomes empty)                 | send the ticket down
+    the dispatcher steps in                    |
+              |                                v
+              |            +----------------------------------------+
+              |            | [ 3. Dispatcher: Event Loop ] (looping)|
+              |            | Rules:                                 |
+              |            | - The Call Stack must be empty         |
+              |            | - Clear VIP tasks first                |
+              |            | - Then take one regular task           |
+              |            +------------------+---------------------+
+              |                               |
+              +<------------------------------+
+              |     Check VIP queue first,
+              |     otherwise take from regular queue (FIFO)
+              |
++-------------+-------------+   +-------------------------------+
+|   [ VIP Area ]            |   |   [ Regular Area ]            |
+|   (Microtask Queue)       |   |   (Task / Macrotask Queue)    |
+|   - Promise.then()        |   |   - setTimeout callbacks      |
+|   - async/await resume    |   |   - Click event handlers      |
++---------------------------+   +-------------------------------+
 ```
 
 > The Event Loop constantly checks whether the Call Stack is empty.
@@ -119,7 +105,7 @@ This process runs continuously as a loop:
 
 ---
 
-### Queue Priority: Microtasks vs Macrotasks
+## Queue Priority: Microtasks vs Macrotasks
 
 Not all tasks are treated equally. The dispatcher follows a strict priority order when scheduling tasks:
 
@@ -133,7 +119,7 @@ Not all tasks are treated equally. The dispatcher follows a strict priority orde
 
 ---
 
-### Execution Order Example
+## Execution Order Example
 
 ```js
 console.log("A"); // Executed immediately by the chef
@@ -162,7 +148,7 @@ console.log("D"); // Executed next by the chef
 
 ---
 
-### **process.nextTick vs Promise**
+## **process.nextTick vs Promise**
 
 ```js
 process.nextTick(() => console.log('tick'));         // Highest-priority microtask (Node.js only)
@@ -175,7 +161,7 @@ console.log('sync');                                  // Synchronous code execut
 
 ---
 
-### **async/await and the Event Loop**
+## **async/await and the Event Loop**
 
 ```js
 async function foo() {
@@ -244,7 +230,7 @@ requestAnimationFrame(() => {
 console.log('script end');
 ```
 
-### Execution Order Breakdown
+## Execution Order Breakdown
 
 1. **Synchronous execution:**
    `script start` → `script end`
