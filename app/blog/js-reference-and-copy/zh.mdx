@@ -1,0 +1,581 @@
+# JavaScript 物件真的被複製了嗎？從 Reference、淺拷貝到 React State
+
+## TL;DR
+
+在 JavaScript 中，把物件指派給另一個變數並不會複製物件，只會複製指向它的 reference。spread operator（`{ ...obj }`、`[...arr]`）也只建立第一層的新容器，巢狀的物件與陣列仍由新舊兩份資料共享。`JSON.parse(JSON.stringify())` 會讓 `Date`、`Map`、`undefined` 等值失真；`structuredClone()` 是比較可靠的 deep clone，但它也不是什麼都能複製。
+
+React 用 `Object.is` 比較新舊 state 與 props，判斷依據是 **reference 有沒有改變**，而不是內容是否相同。因此，正確的 state 更新不是每次都 deep clone，而是避免直接 mutation，只在真正改變的資料路徑上建立新的 reference，其餘部分沿用原本的 reference。理解「內容相同」與「reference 相同」的差別，也是看懂 `React.memo`、`useMemo` 與 dependency array 的前提。
+
+---
+
+## 1. 為什麼改了 copy，user 也跟著變？
+
+先看一段幾乎每個人都寫過的程式碼：
+
+```js
+const user = {
+  name: 'Joey'
+}
+
+const copy = user
+
+copy.name = 'Alex'
+
+console.log(user.name) // 'Alex'
+```
+
+明明宣告了兩個變數，也只改了 `copy`，`user.name` 卻跟著變成 `'Alex'`。
+
+這不是 bug，而是 JavaScript 處理物件的方式：`const copy = user` **從頭到尾沒有複製任何物件。**
+
+### 寄物櫃與號碼牌
+
+想像一座車站寄物櫃。你把行李放進櫃子，櫃台給你一張號碼牌。之後要取行李，你手上拿的不是行李本身，而是那張號碼牌。
+
+這個場景裡有三個角色，會貫穿整篇文章：
+
+* **寄物櫃**：記憶體中真正存在的物件，東西都放在裡面。
+* **號碼牌**：變數持有的 reference，告訴你該去開哪一個櫃子。
+* **櫃台管理員**：負責判斷哪些櫃子有異動。他怎麼判斷、為什麼會看走眼，要等到 React 登場才會說明，這裡先讓他待在櫃台後面。
+
+有了這個畫面，`const copy = user` 做的事就很清楚了：**把號碼牌影印一張。**
+
+兩張號碼牌寫著同一個號碼，不管拿哪一張去開，打開的都是同一個櫃子。透過 `copy` 把名字改成 `'Alex'`，等於打開櫃子換掉裡面的東西；之後拿 `user` 那張去開，看到的當然也是 `'Alex'`。
+
+```
+user ─────┐
+          ↓
+   { name: 'Joey' }
+          ↑
+copy ─────┘
+```
+
+assignment 複製的是號碼牌，不是櫃子。
+
+### Primitive 為什麼沒有這個問題？
+
+換成數字、字串、布林值，結果就不一樣了：
+
+```js
+let a = 1
+let b = a
+
+b = 2
+
+console.log(a) // 1
+```
+
+概念上可以這樣理解：
+
+* **primitive**（number、string、boolean 等）的變數直接持有值本身。
+* **object、array、function** 的變數持有的是指向物件的 reference。
+
+嚴格來說，JavaScript 的指派一律是「複製變數裡存的值」，只是物件變數裡存的值本身就是一個 reference，這個模型常被稱為 **call by sharing**。這個名稱主要是用來描述物件：兩個變數共用同一個物件，透過其中一個修改內容，另一個也會看到。**primitive 則不會有這個現象，因為 primitive 無法被修改，任何「修改」其實都是產生一個新的值，所以可以直接把它理解成「變數持有值本身」。**
+
+### 改櫃子裡的東西，和換一張號碼牌
+
+還有一個很容易混在一起的情況：
+
+```js
+let user = { name: 'Joey' }
+let copy = user
+
+copy = { name: 'Alex' }
+
+console.log(user.name) // 'Joey'
+```
+
+這次 `user` 完全沒受影響。原因是 `copy = { ... }` 並沒有打開櫃子改東西，而是讓 `copy` 換拿另一張號碼牌，指向一個全新的櫃子。
+
+兩種操作的差別如下：
+
+| 寫法 | 寄物櫃比喻 | 影響範圍 |
+| --- | --- | --- |
+| `copy.name = 'Alex'` | 拿號碼牌開櫃子，改裡面的東西 | 所有持有同一號碼的變數都看得到 |
+| `copy = { ... }` | 換一張新的號碼牌 | 只影響 `copy` 自己 |
+
+把物件傳進函式也是同樣的道理：參數拿到的是影印的號碼牌。函式內部修改參數的屬性，呼叫端的物件也會一起被改；但如果在函式裡把參數重新指派成新物件，就不會影響呼叫端。
+
+「改內容」和「換 reference」的區分，會在後面的章節反覆出現。
+
+**🚨 誤區代價：把 `=` 當成備份。**
+
+```js
+const defaultValues = { name: '', email: '' }
+
+const formData = defaultValues // 以為是一份新的表單資料
+formData.name = 'Joey'
+
+// 使用者按下「重設」
+resetForm(defaultValues) // defaultValues.name 已經是 'Joey'
+```
+
+`formData` 和 `defaultValues` 拿的是同一張號碼牌，修改表單資料的同時，預設值也被汙染了，「重設」按鈕因此失效。
+
+同樣的事也常發生在函式裡。像 `normalize(user)` 這類函式，如果直接修改參數再回傳，呼叫端的原始資料就會被悄悄改掉。這類 bug 通常不會在修改的當下出錯，而是在很後面、看起來毫不相關的地方才浮現，很難追查。
+
+---
+
+## 2. 淺拷貝到底複製了什麼？
+
+既然 `=` 不會複製物件，很多人接著會用 spread：
+
+```js
+const user = {
+  name: 'Joey',
+  address: {
+    city: 'Taipei'
+  }
+}
+
+const copy = { ...user }
+
+copy === user                 // false
+copy.address === user.address // true
+```
+
+第一個比較是 `false`，表示最外層確實是一個新物件。第二個卻是 `true`，`address` 仍然是同一個。這就是 **shallow copy** 的核心。
+
+用寄物櫃來說，`{ ...user }` 是**開了一個新櫃子，再把舊櫃子裡的東西逐項搬過來**：
+
+* `name` 是字串，直接放進新櫃子。
+* `address` 本身是另一個櫃子，舊櫃子裡放的只是它的號碼牌。所以搬過來的也只是那張號碼牌的影本。
+
+```
+user ──→ {
+           name: 'Joey',
+           address ─────┐
+         }              ↓
+                 { city: 'Taipei' }
+                        ↑
+copy ──→ {              │
+           name: 'Joey',│
+           address ─────┘
+         }
+```
+
+所以兩種修改的結果不同：
+
+```js
+copy.name = 'Alex'          // 只改到 copy，user.name 仍是 'Joey'
+copy.address.city = 'Tokyo' // user.address.city 也變成 'Tokyo'
+```
+
+陣列也一樣，`[...arr]` 只建立第一層的新陣列，裡面的物件仍然共享。`Object.assign({}, obj)`、`arr.slice()`、`Array.from(arr)` 也都屬於淺拷貝。
+
+層數越多，越容易忘記這件事：
+
+```js
+const state = {
+  user: {
+    profile: { name: 'Joey' }
+  }
+}
+
+const nextState = { ...state }
+
+nextState === state                           // false
+nextState.user === state.user                 // true
+nextState.user.profile === state.user.profile // true
+```
+
+spread 只換掉最外面那一個櫃子，往下每一層都是原本的櫃子。
+
+補充一個細節：spread 只複製物件自身可列舉的屬性，不會保留 prototype。所以 class instance 經過 `{ ...instance }` 會變成普通物件，失去原本的方法；getter 也會先被執行，再以一般值的形式複製過去。
+
+**🚨 誤區代價：以為「先 spread 再修改」就是安全的草稿。**
+
+```js
+const draft = { ...settings }
+draft.notifications.email = false
+```
+
+使用者在設定頁按下「取消」，但 `settings.notifications.email` 早就被改掉了。草稿只隔離了第一層，巢狀資料從頭到尾都是共用的。
+
+---
+
+## 3. 為什麼 React State 在意 Reference？
+
+這時候終於輪到櫃台管理員上場。先看一段常見的錯誤寫法，頁面上有一個名字和一個計數器：
+
+```jsx
+function Profile() {
+  const [user, setUser] = useState({ name: 'Joey' })
+  const [count, setCount] = useState(0)
+
+  function rename() {
+    user.name = 'Alex' // ❌ 直接修改物件
+    setUser(user)      // 交回同一個物件
+  }
+
+  return (
+    <div>
+      <p>名字：{user.name}</p>
+      <p>次數：{count}</p>
+      <button onClick={rename}>改名</button>
+      <button onClick={() => setCount(count + 1)}>+1</button>
+    </div>
+  )
+}
+```
+
+呼叫 `setUser` 時，React 會用 `Object.is` 比較新舊 state。這裡傳進去的是同一個物件，比較結果相同，React 就會跳過這次更新。
+
+換成比喻：**React 這位管理員不會打開櫃子檢查內容，他只核對號碼牌**。你偷偷換了櫃子裡的東西，卻交回同一張號碼牌，管理員就會判斷「沒有異動」。
+
+React 這樣設計有它的理由。比較兩個 reference 只要一步，但要確認兩棵物件樹的內容完全相同，就得逐層走訪，資料越大成本越高。代價是開發者必須遵守一個約定：**有改變，就給新的 reference。**
+
+### 畫面會在意想不到的時候更新
+
+這段程式碼的問題不只是「畫面沒更新」。依序操作看看：
+
+| 步驟 | 操作 | 物件裡的 `user.name` | 畫面顯示 |
+| --- | --- | --- | --- |
+| 0 | 打開頁面 | Joey | 名字：Joey，次數：0 |
+| 1 | 按「改名」 | Alex | 名字：Joey，次數：0 |
+| 2 | 按「+1」 | Alex | 名字：Alex，次數：1 |
+
+按「改名」時，物件內容其實已經被改掉了，只是 React 沒有重新 render。等到按「+1」，`count` 改變觸發 render，元件才讀到被改掉的名字。
+
+結果就是：**按「改名」沒反應，按「+1」名字卻變了。** 就像偷換的東西一直沒被發現，直到管理員因為別的事打開櫃子才露餡。原因和症狀出現的時機對不上，這比單純不更新更難除錯。
+
+### 「跳過更新」不代表元件一定沒執行
+
+在 `Profile` 裡加上 `console.log`，並放入一個子元件：
+
+```jsx
+function Profile() {
+  console.log('Profile 執行了')
+  // ...其餘同上
+  return (
+    <div>
+      {/* ... */}
+      <Child />
+    </div>
+  )
+}
+
+function Child() {
+  console.log('Child 執行了')
+  return <p>子元件</p>
+}
+```
+
+按下「改名」後，console 有時會印出：
+
+```
+Profile 執行了
+```
+
+但不會出現 `Child 執行了`，畫面也沒有任何變化。這是因為 React 有時會先執行一次 `Profile`，確認新舊 state 相同後才停下來，不再執行子元件，也不更新畫面。這是正常行為，不是 bug。所以準確的說法是：交回同一個 reference，React 會**跳過這次更新**，但**不保證元件函式完全不執行**。
+
+### 正確寫法
+
+建立新物件：
+
+```js
+setUser({ ...user, name: 'Alex' })
+```
+
+新物件就是新櫃子、新號碼牌，管理員一比對就知道換了。
+
+> mutation 改的是原物件的內容；immutable update 則建立新的 reference。
+
+**🚨 誤區代價**：直接修改 state 物件再呼叫 setter，畫面可能不會更新，或在某個無關的操作之後才突然更新。bug 的位置和症狀出現的位置不同，看起來就像隨機發生。
+
+---
+
+## 4. Nested State 要怎麼正確更新？
+
+學會外層 spread 之後，很容易寫出這段有誤的程式碼：
+
+```js
+const [user, setUser] = useState({
+  name: 'Joey',
+  address: { city: 'Taipei' }
+})
+
+function moveToTokyo() {
+  const nextUser = { ...user }
+  nextUser.address.city = 'Tokyo'
+  setUser(nextUser)
+}
+```
+
+這段程式碼的**畫面其實會更新**。因為 `nextUser !== user`，管理員看到新號碼牌，會照常重新 render。也因為「看起來可以動」，這個 bug 特別容易藏下來。
+
+問題出在 `nextUser.address === user.address`。你開了新的外層櫃子，卻打開舊的 `address` 櫃子改了東西。凡是只盯著 `address` 號碼牌的地方，都看不出任何變化：
+
+```jsx
+const AddressCard = memo(function AddressCard({ address }) {
+  return <p>{address.city}</p>
+})
+
+<AddressCard address={user.address} />
+// address 的 reference 沒變，memo 判斷不需要 render，畫面仍顯示 Taipei
+
+useEffect(() => {
+  syncAddress(user.address)
+}, [user.address])
+// dependency 沒變，effect 不會執行
+```
+
+此外，舊的 state 也被改掉了。如果你保存了上一版 state 來做 undo，會發現上一版的城市也是 `'Tokyo'`。
+
+正確做法是沿著變動的路徑，每一層都建立新物件：
+
+```js
+setUser({
+  ...user,
+  address: {
+    ...user.address,
+    city: 'Tokyo'
+  }
+})
+```
+
+更新後，哪些是新的、哪些仍然共享，可以這樣看：
+
+```
+user（新）
+ ├─ name          ← 沿用原值
+ └─ address（新）
+     └─ city: 'Tokyo'
+```
+
+`address` 換了新櫃子，`AddressCard` 和 effect 都能偵測到變化。
+
+巢狀超過兩、三層時，逐層 spread 會變得冗長又容易漏。這時可以考慮兩個方向：React 文件建議的「把 state 結構攤平」，或使用 Immer 這類讓你用 mutation 語法寫、實際產生不可變更新的工具。
+
+**🚨 誤區代價**：只 spread 外層，導致內層被 mutation。畫面主體會更新，但 `memo` 子元件、依賴巢狀物件的 effect、undo 歷史都會出錯。而且出錯的地方都離真正寫錯的那一行很遠。
+
+---
+
+## 5. Array 也有相同問題
+
+陣列 state 最常見的情境是列表。例如切換 todo 的完成狀態：
+
+```js
+// ❌ 外層是新陣列，但 next[index] 仍是舊物件
+const next = [...todos]
+next[index].done = !next[index].done
+setTodos(next)
+```
+
+這和上一節是同一個陷阱：新陣列是新的櫃子排列，但每一格放的仍是舊物件的號碼牌。改了 `next[index].done`，就等於改了原本的 todo。如果 `TodoItem` 用了 `memo`，它收到的 `todo` reference 沒變，就不會重新 render。
+
+正確寫法是用 `map`，只替換被修改的那一筆：
+
+```js
+setTodos(todos.map(todo =>
+  todo.id === id ? { ...todo, done: !todo.done } : todo
+))
+```
+
+被修改的那一格換成新櫃子，其餘各格繼續沿用舊號碼牌。
+
+另一個要注意的是：**有些陣列方法本身就會 mutation**。
+
+| 會修改原陣列 | 回傳新陣列 |
+| --- | --- |
+| `push`、`pop`、`shift`、`unshift` | `concat`、`[...arr, item]` |
+| `splice` | `slice`、`filter`、`toSpliced` |
+| `sort`、`reverse` | `toSorted`、`toReversed` |
+| `arr[i] = x`、`fill` | `map`、`with(i, x)` |
+
+`toSorted`、`toReversed`、`toSpliced`、`with` 是 ES2023 加入的方法，現代瀏覽器都已支援；如果需要支援較舊的環境，要先確認相容性。
+
+在 render 裡直接寫 `todos.sort()` 會改到 state 本身，可以改寫成 `[...todos].sort()` 或 `todos.toSorted()`。排序只會改變新陣列的順序，不會動到裡面的物件，所以這裡淺拷貝就足夠了。
+
+**🚨 誤區代價**：`[...todos]` 後修改元素屬性，或在 state 上呼叫 `sort`、`reverse`。列表項目狀態不同步、排序莫名「黏」在原資料上，都是典型的症狀。
+
+---
+
+## 6. Deep Clone 不是 React 的萬靈丹
+
+看完前面幾節，很自然會想：「每次更新都整個 deep clone，不就不用煩惱了？」
+
+這會走到另一個極端。deep clone 會讓**每一層、每一個物件**都換成新的 reference。對只看號碼牌的管理員來說，整座寄物櫃都換過了：
+
+* 所有 `memo` 子元件都會重新 render，因為每個 prop 都是新的。
+* 所有以物件當 dependency 的 effect 都會重新執行。
+* 每次更新都要複製整棵資料樹，資料越大越慢。
+
+換句話說，deep clone 製造的是「內容相同，但 reference 不同」的物件。這恰好是 React 用來判斷變化的依據最不擅長處理的情況。
+
+React state 需要的不是整棵複製，而是：
+
+> **沿著發生變化的路徑，建立新的 references。**
+
+```
+state（新）
+ ├─ user（新）
+ │   └─ address（新）
+ │       └─ city: 'Tokyo'  ← 實際改變
+ ├─ settings   ← 沿用原 reference
+ └─ todos      ← 沿用原 reference
+```
+
+只為變動的那一路開新櫃子，沒變的部分直接沿用舊號碼牌。管理員能準確看出哪裡有異動，沒變的子元件也能安心跳過 render。這個做法稱為 **structural sharing**，Immer 和 Redux Toolkit 都是以它為基礎設計的。
+
+**🚨 誤區代價**：用 deep clone 取代不可變更新。程式邏輯雖然正確，但 `memo` 全面失效，effect 頻繁觸發，大型 state 每次更新都要付出完整複製的成本。
+
+---
+
+## 7. JSON Clone 與 structuredClone
+
+即使不用在 React state，deep clone 仍然有正當用途。例如讓編輯中的草稿和原始資料完全隔離，或準備測試資料。這時候要選對工具。
+
+### JSON.parse(JSON.stringify())
+
+這是很多人最先想到的寫法，但它的行為像是**把櫃子裡的東西寫成一張文字清單，再照清單重新採購**。清單只能寫文字，寫不進去的東西就會消失或變形：
+
+```js
+const original = {
+  createdAt: new Date('2026-10-02'),
+  tags: new Set(['js', 'react']),
+  note: undefined,
+  scores: [undefined, NaN, Infinity],
+  format() {}
+}
+
+const copy = JSON.parse(JSON.stringify(original))
+// {
+//   createdAt: '2026-10-02T00:00:00.000Z', ← Date 變成字串
+//   tags: {},                              ← Set 變成空物件
+//   scores: [null, null, null]             ← 陣列中的特殊值變成 null
+// }
+// note 和 format 直接消失
+```
+
+| 原始值 | 結果 |
+| --- | --- |
+| `undefined`、function | 在物件中被省略，在陣列中變成 `null` |
+| `Date` | 變成 ISO 字串 |
+| `Map`、`Set` | 變成 `{}` |
+| `NaN`、`Infinity` | 變成 `null` |
+| 循環參照、`BigInt` | 直接拋出 `TypeError` |
+
+這些不是 bug。JSON 是資料交換格式，它的設計目的本來就不是通用的物件複製。
+
+### structuredClone()
+
+`structuredClone()` 是瀏覽器和 Node.js（17 版起）內建的 deep clone。它支援 `Date`、`Map`、`Set`、`RegExp`、typed array，也能正確處理循環參照：
+
+```js
+const copy = structuredClone(original)
+
+copy.createdAt instanceof Date // true
+copy.tags instanceof Set       // true
+```
+
+它比較像**專業搬家公司整櫃複製**，但有些東西搬家公司不收，有些搬過去會變樣：
+
+* **function**：直接拋出 `DataCloneError`，所以上例的 `original` 因為有 `format()` 其實會失敗，要先移除方法才能複製。
+* **DOM 節點**：同樣拋出 `DataCloneError`。
+* **class instance**：會失去 prototype，變成普通物件，方法也不見了。
+* **getter / setter**：property descriptor 不會保留。
+
+所以 `structuredClone` 是比 JSON 更好的 deep clone，但只在它支援的型別範圍內成立。
+
+> 能 deep clone，不代表每次 React state 更新都應該 deep clone。
+
+**🚨 誤區代價**：用 JSON 複製含有 `Date` 的資料後，呼叫 `copy.createdAt.getTime()` 會出現 `getTime is not a function`。改用 `structuredClone` 卻沒注意到物件裡有方法，則會在執行時拋出 `DataCloneError`。
+
+---
+
+## 8. Reference Equality 與 React 效能
+
+reference 不只決定 state 會不會更新，也影響 React 能不能跳過不必要的 render。
+
+```jsx
+const Child = memo(function Child({ config }) {
+  // ...
+})
+
+function Parent() {
+  const [count, setCount] = useState(0)
+  const config = { theme: 'dark' }
+
+  return <Child config={config} />
+}
+```
+
+`memo` 會用 `Object.is` 逐一比較新舊 props。問題是 `Parent` 每次 render 都會重新執行 `const config = { theme: 'dark' }`，產生一個新物件：
+
+```js
+previousConfig !== nextConfig // 內容一樣，reference 不同
+```
+
+這就像**每次都開一個新櫃子，放進一模一樣的東西**。管理員只核對號碼牌，於是每次都判斷「有異動」。結果 `count` 一改變，`Child` 就跟著 render，`memo` 形同虛設。
+
+常見的修正方式有三種：
+
+```jsx
+// 1. 內容固定時，移到元件外面
+const config = { theme: 'dark' }
+
+// 2. 內容依賴其他值時，用 useMemo 保留 reference
+const config = useMemo(() => ({ theme }), [theme])
+
+// 3. 改傳 primitive，直接避開問題
+<Child theme="dark" />
+```
+
+dependency array 也是同樣的規則。`useEffect(() => { ... }, [config])` 如果 `config` 每次都是新物件，effect 就會在每次 render 後都執行。
+
+function 也是同樣的道理。第 1 節提過，function 和物件一樣，變數持有的是 reference，而元件裡的 inline function 每次 render 都會重新建立：
+
+```jsx
+function Parent() {
+  const handleSave = () => {
+    save(draft)
+  } // 每次 render 都是新的 function
+
+  return <Child onSave={handleSave} />
+}
+```
+
+即使 `Child` 用了 `memo`，`onSave` 每次都是新的 reference，`memo` 一樣失效。`useCallback` 的作用，就是在 dependency 沒變時保留同一個 function reference：
+
+```js
+const handleSave = useCallback(() => {
+  save(draft)
+}, [draft])
+```
+
+可以把它理解成 function 版的 `useMemo`：`useMemo` 保留計算結果的 reference，`useCallback` 保留 function 本身的 reference。
+
+使用時要注意，dependency array 必須列出 function 內用到的值。漏列的話，function 會一直讀到建立當下的舊資料，這種問題稱為 **stale closure**，是使用 `useCallback` 最常見的錯誤。
+
+兩個但書：
+
+1. **不是每次多餘的 render 都需要處理。** `memo`、`useMemo`、`useCallback` 本身也有比較與記憶的成本，應該先確認真的有效能問題再優化。
+2. **React Compiler 推出穩定版後**，開啟它的專案會由編譯器自動處理大部分這類 memoization，手寫 `useMemo`、`useCallback` 的需求大幅減少。不過 Compiler 的前提就是「不直接 mutation」，判斷依據依然是 reference。理解這件事，才能看懂 Compiler 為什麼有效，以及它在什麼情況下無法幫你。
+
+> React 世界裡，「內容相同」和「reference 相同」是兩件不同的事。
+
+**🚨 誤區代價**：幫子元件加了 `memo`，卻每次 render 都傳入新的物件或 function。效能沒有改善，還多付了一次 props 比較的成本。
+
+---
+
+## 9. 最終整理：Copy、Mutation、Identity
+
+回到開頭的問題：為什麼改了 `copy`，`user` 也跟著變？
+
+因為 `const copy = user` 只是影印了號碼牌，兩張號碼牌開的是同一個櫃子。之後的每一種複製方式，差別都在於「哪些櫃子是新的，哪些仍然共享」：
+
+| 操作 | 寄物櫃比喻 | 第一層是新 reference？ | 巢狀物件是新的？ |
+| --- | --- | --- | --- |
+| `b = a` | 影印號碼牌 | 否 | 否 |
+| `a.x = 1`（mutation） | 打開櫃子改東西 | 否 | 否 |
+| `{ ...a }`、`[...arr]`（淺拷貝） | 開新櫃子，巢狀部分只放號碼牌影本 | 是 | 否 |
+| `JSON.parse(JSON.stringify(a))` | 照清單重新採購 | 是 | 是，但部分型別失真或消失 |
+| `structuredClone(a)` | 搬家公司整櫃複製 | 是 | 是（限支援的型別） |
+| 沿變動路徑的 immutable update | 只為變動的那一路開新櫃子 | 是 | 只有變動路徑上的是新的 |
+
+React 這位管理員只核對號碼牌。所以 mutation 會讓他看漏變化，deep clone 會讓他誤以為一切都變了，每次 render 都建立新物件則會讓 `memo` 白做。三種問題的根源都一樣：**沒有搞清楚 reference 何時相同、何時不同。**
+
+> Shallow copy 和 deep copy 真正重要的，不是「複製了幾層」，而是你是否理解 reference identity，以及哪些資料其實仍然是共享的。
+
+> **React state 更新的關鍵，也不是每次 deep clone，而是避免直接 mutation，並在真正改變的資料路徑上建立新的 references。**

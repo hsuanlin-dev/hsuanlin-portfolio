@@ -1,0 +1,479 @@
+# From Browser Rendering to React Reconciliation: The Complete UI Update Flow
+
+## TL;DR
+
+In React development, **React rendering, DOM updates, browser rendering, and painting** are often loosely grouped together as "updating the UI."
+
+But they actually belong to different layers of the process:
+
+**React is responsible for calculating what the UI should look like, the DOM reflects the actual structural changes, and the browser is responsible for turning those changes into pixels on the screen.**
+
+For a state update to actually become visible to the user, it has to go through several distinct stages.
+
+The problem with mixing these concepts together usually isn't that it prevents us from writing working code. The bigger problem is that it makes performance issues easy to diagnose incorrectly. For example, we might mistake a React re-render for a browser repaint and start adding `memo` everywhere, or fail to understand why `useLayoutEffect` can block rendering.
+
+If you remember only one sentence from this article, let it be this:
+
+> **React decides how the DOM should change; the browser turns the DOM into pixels on the screen.**
+
+---
+
+## 1. Start With the Question: "Updating the UI" Is Not One Single Thing
+
+In React, incrementing a number on the screen may require only one line:
+
+```js
+setCount(count + 1)
+```
+
+This line is so common that we rarely stop to think about what actually happens behind it.
+
+But once you do, two questions immediately come up:
+
+* **After calling `setCount`, does React modify the DOM immediately?**
+* **After the DOM changes, does the browser immediately draw the new pixels on the screen?**
+
+The confusion comes from the fact that we often use the phrase "update the UI" to describe all of these things — React render, DOM update, browser rendering, and paint — as if they were simply different names for the same operation.
+
+They are not. They happen at different stages and are handled by different parts of the system.
+
+You can think of the whole process like an interior design company receiving a renovation request.
+
+The homeowner first describes what they want. The designer then redraws the plan. Once everyone knows what actually needs to change, the construction team enters the building and performs the work. Only after that does the homeowner see the finished result.
+
+**A completed design plan does not mean the house has already been renovated. And even after the renovation is finished, that still does not necessarily mean the final image has already reached your eyes.**
+
+So before bringing React into the picture, let's start at a lower level:
+
+**How does a browser turn HTML into pixels on the screen?**
+
+---
+
+## 2. Before React: How Does the Browser Turn HTML Into a UI?
+
+No matter how frontend frameworks evolve, the browser is still ultimately responsible for displaying content on the screen.
+
+Using a simplified model, the **Browser Rendering Pipeline** can be understood roughly like this:
+
+```
+HTML           CSS
+ ↓              ↓
+DOM           CSSOM
+  └──────┬──────┘
+         ↓
+    Render Tree
+         ↓
+       Layout
+         ↓
+       Paint
+         ↓
+     Composite
+         ↓
+       Screen
+```
+
+The actual internal implementation of a browser engine is much more complex, but this simplified model is enough to understand most frontend performance problems.
+
+### DOM and CSSOM
+
+The browser parses HTML and builds a tree structure called the **DOM**. It also parses CSS and builds the **CSSOM**. At this point, the browser essentially has two sets of information: what exists on the page, and what those things should look like.
+
+### Render Tree: What Actually Needs to Be Drawn
+
+Information from the DOM and CSSOM together determines what needs to participate in rendering. The important thing here is: **the DOM is not the same thing as what ultimately gets drawn.** For example:
+
+```css
+.modal {
+  display: none;
+}
+```
+
+The element still exists in the DOM, and JavaScript can still access it. But because it does not need to appear visually, it does not participate in normal layout and paint.
+
+### Layout: Calculating Position and Size
+
+The **Layout** phase calculates the width, height, and position of each element. What used to commonly be called **reflow** refers to this kind of work. A size change to one element may affect surrounding elements — or even the layout of the entire page — so Layout can be one of the more expensive stages in the rendering pipeline.
+
+### Paint: Deciding How Things Should Be Drawn
+
+The **Paint** phase determines how things such as backgrounds, borders, text, and shadows should actually be drawn. If Layout answers "Where should this element be placed?", then Paint answers "What should it look like?"
+
+### Composite: Combining the Final Layers
+
+Modern browsers may render different parts of the page on separate layers. The **Composite** phase combines those layers into the final image the user sees. Layer creation and rasterization involve implementation details specific to browser engines, so we do not need to go too deep into them here. For now, the important idea is: **compositing is one of the final stages before the rendered result appears on screen.**
+
+---
+
+## 3. What Happens When JavaScript Changes the DOM?
+
+The previous section described the initial page load. But what happens when JavaScript changes the DOM after the page is already visible?
+
+```js
+element.textContent = 'Hello'
+element.style.width = '500px'
+```
+
+After these lines execute, the DOM really has changed. If we immediately read `element.textContent`, we will get `'Hello'`. But:
+
+> **Changing the DOM does not mean the screen updates instantly.**
+
+```js
+box.style.width = '100px'
+box.style.width = '200px'
+box.style.width = '300px'
+```
+
+If the browser repainted the screen immediately after every DOM mutation, the user should theoretically see the box move through `100px` → `200px` → `300px`. But in practice, they will usually see only the final `300px` state.
+
+One reason is that JavaScript execution and many browser rendering tasks rely on the **main thread**. While JavaScript is still running, the browser generally does not insert a full rendering pass between every line of code. So a useful mental model is:
+
+> **The browser generally waits until JavaScript has finished its current work and the main thread becomes available again before continuing with style calculation, layout, paint, and other rendering work.**
+
+It is similar to a renovation project: you would not take a new "finished" photo every time someone moves a chair.
+
+There is one important exception. If you modify styles and then immediately read a layout-dependent property such as `offsetWidth`, the browser may be forced to perform Layout synchronously right away. This is known as **forced synchronous layout**. Even then, however, **the resulting pixels still cannot be painted to the screen until JavaScript gives the browser a chance to render.**
+
+So we can now answer the second question from the introduction:
+
+> **After the DOM changes, the new pixels do not necessarily appear on the screen immediately.**
+
+---
+
+## 4. What Extra Layer Does React Add?
+
+In React, we usually do not write code like `element.textContent = ...`. Instead, we update state with `setState`. Before going further, remember the most important idea in this article:
+
+> **React does not replace browser rendering. React decides how the DOM should change.**
+
+React does not draw pixels to the screen itself. It sits in front of the browser, calculates what the DOM should look like, and then hands the result over to the browser. The flow becomes:
+
+```
+State update
+    ↓
+React render              ┐
+    ↓                     │
+Reconciliation            │ React's work
+    ↓                     │
+Commit                    ┘
+    ↓
+Real DOM changes
+    ↓
+Browser rendering         ┐
+    ↓                     │ Browser's work
+Layout / Paint / Composite┘
+```
+
+The lower half of this diagram is still the same browser pipeline from Section 2 — React does not replace it. The next three sections focus on the React-specific part at the top.
+
+---
+
+## 5. What Does React's Render Phase Actually Do?
+
+First, we need to clear up one of the most common misconceptions:
+
+> **In React, "render" does not mean drawing something on the screen.**
+
+React render means executing a component function using the current props and state in order to produce a new **React element tree** describing what the UI should look like. It is like an architect **redrawing the blueprint** — no construction has happened yet.
+
+```jsx
+function Counter() {
+  const [count, setCount] = useState(0)
+
+  return <div>{count}</div>
+}
+```
+
+When `count` changes, React calls `Counter()` again and receives a new description of the UI. But this distinction is important:
+
+> **A component function being executed does not necessarily mean the DOM will be modified.**
+
+The Render Phase only produces a new plan. That plan may require DOM changes — or it may turn out to be effectively identical to the previous one. Because rendering is supposed to be a calculation, React expects components to behave like **pure functions**. They should not directly mutate the DOM during render.
+
+This also answers the first question from the introduction: **after calling `setCount`, React does not immediately modify the DOM.** Instead, React schedules an update. In common event-handler scenarios, multiple state updates may also be batched together before React begins rendering.
+
+---
+
+## 6. Reconciliation: How Does React Know What Needs to Change?
+
+Once React produces a new description of the UI, it needs to determine: **what is actually different compared with the previous version?** This process is called **Reconciliation**. React compares the previous UI structure with the new one and determines which parts should be **preserved, updated, added,** or **removed**.
+
+```jsx
+<div>
+  <h1>Hello</h1>
+  <span>{count}</span>
+</div>
+```
+
+If only `count` changes, React can determine that the `<div>` and `<h1>` do not need to change. Only the text inside `<span>` needs to be updated — **React does not rebuild the entire DOM tree.**
+
+### A Common Misunderstanding About the Virtual DOM
+
+> **The idea behind the Virtual DOM is not "The DOM is slow, so React avoids using the DOM."**
+
+React ultimately still has to apply necessary changes to the real DOM. Instead, React uses its own data structures to describe the UI. Developers declare "This is what the UI should look like," and React then figures out the **necessary changes**.
+
+### Keys in Lists: Telling React "Who Is Who"
+
+When rendering lists, React uses `key` to determine whether items in the previous and next render represent the same identity:
+
+```jsx
+// ❌ Using the array index as a key can cause problems
+{todos.map((todo, index) => (
+  <TodoItem key={index} todo={todo} />
+))}
+
+// ✅ Use a stable unique value
+{todos.map((todo) => (
+  <TodoItem key={todo.id} todo={todo} />
+))}
+```
+
+**🚨 Why can using the index cause problems?**
+
+Suppose we originally have:
+
+```
+key 0 → A
+key 1 → B
+```
+
+Now we insert X at the beginning:
+
+```
+key 0 → X
+key 1 → A
+key 2 → B
+```
+
+React sees:
+
+```
+key 0 still exists
+key 1 still exists
+```
+
+So React may associate the component identity that previously belonged to A with X, and the identity that previously belonged to B with A.
+
+If those components contain local state, uncontrolled inputs, or other persistent internal state, you may suddenly see behavior like: "Why did the previous item's state move to another item?" This is why the important property of a `key` is not merely that it is unique. It must also remain **stable as the underlying data changes.**
+
+---
+
+## 7. Commit Phase: This Is When React Actually Touches the DOM
+
+After the Render Phase calculates the new UI description and Reconciliation determines what has changed, React enters the **Commit Phase**. In the renovation analogy, this is when the construction crew finally enters the building. The distinction is:
+
+* **Render phase**: React calculates what should change.
+* **Commit phase**: React actually applies those changes to the DOM.
+
+```
+Render:
+  count 0 → 1
+  React determines that the text inside <span> needs to change
+
+Commit:
+  real DOM:
+  <span>0</span>  →  <span>1</span>
+```
+
+Render performs calculations; it does not touch the DOM. **The DOM is only modified during Commit**, and the user does not see the DOM halfway through an update — React applies the necessary mutations together during the commit.
+
+If React finishes rendering and determines that the resulting UI is effectively the same as before, there may be nothing to commit. In that case, the DOM does not change.
+
+> **React render ≠ DOM update**
+>
+> Render means "calculate what the UI should look like." A DOM update means "actually change the page."
+
+---
+
+## 8. After the DOM Changes, the Process Still Isn't Finished
+
+Once Commit completes, the DOM reflects the latest state. But the process still is not over, because: **a changed DOM does not necessarily mean the new UI has already appeared on the screen.** Now control returns to the browser:
+
+```
+DOM updated
+    ↓
+Style calculation
+    ↓
+Layout (if needed)
+    ↓
+Paint (if needed)
+    ↓
+Composite
+    ↓
+Screen
+```
+
+The browser **determines which stages are necessary depending on the type of change**. Changing an element's width or position may require Layout. Changing certain purely visual properties, such as color, may not require Layout. Properties such as `transform` and `opacity` can, under the right conditions, avoid some of the more expensive Layout or Paint work and be handled largely through compositing. This is one reason `transform` is often preferable to repeatedly changing `top` or `left` in high-frequency animations.
+
+Putting everything together, a complete UI update looks roughly like this:
+
+```
+User interaction
+      ↓
+Event handler
+      ↓
+setState
+      ↓
+React schedules update
+      ↓
+Render phase               ┐
+      ↓                    │
+Reconciliation             │ React
+      ↓                    │
+Commit phase               ┘
+      ↓
+DOM mutation
+      ↓
+Browser rendering pipeline ┐
+      ↓                    │
+Layout                     │
+      ↓                    │ Browser
+Paint                      │
+      ↓                    │
+Composite                  ┘
+      ↓
+User sees new UI
+```
+
+This is the process the entire article is trying to separate conceptually: **Browser → DOM → React → DOM → Browser → Pixels**.
+
+---
+
+## 9. Why Does a React Re-render Not Necessarily Mean a DOM Update?
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0)
+  return <Child />
+}
+```
+
+When `Parent`'s state changes, `Child` will also execute again by default. But the UI produced by `Child` may be identical to the previous render. If Reconciliation detects no relevant difference, React does not need to update the DOM:
+
+```
+React re-render    ✓ happened
+DOM mutation       ✗ not necessarily (Reconciliation found no difference)
+Browser repaint    ✗ not necessarily (if the DOM didn't change, the browser has nothing new to render)
+```
+
+This distinction matters because treating a re-render as equivalent to "redrawing the screen" often leads to premature optimization.
+
+For example, you may see a component execute again and immediately start adding:
+
+```
+React.memo
+useMemo
+useCallback
+```
+
+But a normal component re-render may simply mean calling a function again, which is often inexpensive. Overusing memoization also introduces comparison overhead and makes code harder to maintain. A better optimization process is: **first identify which layer is actually causing the performance cost, then optimize that layer.**
+
+The key takeaway is:
+
+> **React render, DOM mutation, and browser paint are three different things happening at three different layers.**
+
+---
+
+## 10. Where Do useEffect and useLayoutEffect Fit?
+
+The difference between these two Effect Hooks mainly comes down to **when they run in the update lifecycle**:
+
+```
+React render
+    ↓
+Commit DOM
+    ↓
+useLayoutEffect   ← DOM has been updated, browser has not painted yet
+    ↓
+Browser paint
+    ↓
+useEffect         ← often runs after the UI is presented (but not always)
+```
+
+### useLayoutEffect
+
+`useLayoutEffect` runs synchronously **after the DOM has been updated but before the browser paints the screen**. It is useful when you need to measure something first and then immediately adjust the DOM based on the result, for example:
+
+* reading an element's position or dimensions
+* immediately adjusting the DOM based on those measurements
+
+A classic example is a tooltip. The tooltip may need to know its own height before deciding whether to appear above or below the target element. If you wait until after the browser paints before correcting its position, the user may briefly see the tooltip appear in the wrong place before jumping into the correct position.
+
+The tradeoff is that **the browser must wait for `useLayoutEffect` to finish before it can paint.** So expensive work should not be placed inside it.
+
+### useEffect
+
+`useEffect` is better suited for side effects that **do not need to block the UI from appearing**, for example:
+
+* sending API requests
+* subscribing to data or registering event listeners
+* synchronizing with external systems
+
+A useful general mental model is: React updates the DOM, then runs `useEffect` at an appropriate time afterward.
+
+However, it is not completely accurate to say "`useEffect` always runs after the browser paints." For updates caused by user interactions such as clicks or input events, React may sometimes execute an Effect before the browser paints.
+
+So the practical rule is simpler: **if your logic must finish before the browser paints, use `useLayoutEffect`.** Do not depend on the exact timing of `useEffect`.
+
+---
+
+## 11. A Complete Example
+
+Finally, let's connect the entire process with a simple example:
+
+```jsx
+function App() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>
+        Open
+      </button>
+
+      {open && <Modal />}
+    </>
+  )
+}
+```
+
+From the moment the user clicks `Open` to the moment the Modal actually appears on the screen, roughly the following happens:
+
+```
+1.  The user clicks the button
+2.  The click handler executes
+3.  setOpen(true) is called
+4.  React schedules an update (the DOM has not changed yet)  → Section 5
+5.  App renders again and produces a new element tree        → Section 5
+6.  React compares the new tree with the previous one:
+      Before: Modal did not exist
+      Now:    Modal exists
+7.  Reconciliation determines new DOM nodes for Modal
+    need to be added                                         → Section 6
+8.  Commit Phase inserts the Modal's DOM nodes into the page → Section 7
+9.  The browser recalculates styles and Layout               → Section 8
+10. The browser Paints and Composites the result             → Section 8
+11. The user sees the Modal
+```
+
+A click that appears to complete almost instantly is actually a relay between **React and the browser**.
+
+---
+
+## 12. The Four Concepts That Are Easiest to Confuse
+
+| Term | What It Actually Does | Mainly Handled By |
+| --- | --- | --- |
+| **React Render** | Executes components and calculates what the UI should look like | React |
+| **Reconciliation** | Compares previous and current UI descriptions to determine what should be preserved, updated, added, or removed | React |
+| **Commit** | Applies the necessary changes to the actual DOM | React |
+| **Browser Rendering** | Turns the DOM/CSS result into the visual output the user sees | Browser |
+
+Finally, let's return to the two questions from the beginning:
+
+* **After calling `setCount`, does React immediately modify the DOM?** No. React first schedules the update, performs rendering and reconciliation to determine what has changed, and only modifies the DOM during the Commit Phase.
+* **After the DOM changes, does the browser immediately draw the new pixels?** Not necessarily. The browser needs an opportunity to run its rendering work after JavaScript yields the main thread. Depending on the type of change, it may need to perform Layout, Paint, and Composite before the new result appears on the screen.
+
+The architect finishing the blueprint does not mean the house has already been renovated. And the renovation being complete does not mean the homeowner has already seen the result. The entire article can ultimately be reduced to one idea:
+
+> **React decides how the DOM should change; the browser turns the DOM into what the user actually sees.**

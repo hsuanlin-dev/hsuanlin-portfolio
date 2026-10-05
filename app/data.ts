@@ -259,6 +259,18 @@ export const EDUCATION: Education[] = [
 export const BLOG_POSTS: BlogPost[] = [
   {
     title: {
+      en: 'From Browser Rendering to React Reconciliation: The Complete UI Update Flow',
+      zh: '從 Browser Rendering 到 React Reconciliation：畫面更新的完整流程',
+    },
+    description: {
+      en: 'Understand how a state update flows through React reconciliation, DOM updates, and browser rendering to finally become pixels on screen.',
+      zh: '理解一次 state update 如何經過 React reconciliation、DOM 更新與瀏覽器渲染，最終變成畫面上的像素。',
+    },
+    link: '/blog/browser-to-react-rendering',
+    uid: 'blog-react-reconciliation',
+  },
+  {
+    title: {
       en: 'JavaScript Event Loop Explained: Understanding Microtasks and Macrotasks with a Stir-Fry Restaurant Analogy',
       zh: '深入淺出 JavaScript Event Loop：熱炒店比喻，理解微任務與宏任務',
     },
@@ -271,51 +283,15 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     title: {
-      en: 'In-Depth Guide to JavaScript Asynchrony: Promise, Async/Await, and a Handwritten Promise.all',
-      zh: 'JavaScript 非同步深度解析：Promise、Async/Await 與手寫 Promise.all',
+      en: 'Are JavaScript Objects Really Copied? From References and Shallow Copies to React State',
+      zh: 'JavaScript 物件真的被複製了嗎？從 Reference、淺拷貝到 React State',
     },
     description: {
-      en: 'A deeper understanding of JavaScript asynchrony, Promise, and Async/Await.',
-      zh: '深入理解 JavaScript 非同步、Promise 與 Async/Await。',
+      en: 'Understand references, shallow copies, and deep clones in JavaScript, and why reference equality matters for React state updates.',
+      zh: '理解 JavaScript 的 reference、淺拷貝與深拷貝，以及為什麼 reference 是否改變對 React state 更新至關重要。',
     },
-    link: '/blog/javascript-promise-async-await',
-    uid: 'blog-2',
-  },
-  {
-    title: {
-      en: 'JavaScript Closures: From the Explorer’s Backpack Analogy to Real-World Applications',
-      zh: 'JavaScript 閉包 (Closure)：從探險家背包比喻到實際應用',
-    },
-    description: {
-      en: 'Understand JavaScript closures through the “explorer’s backpack” analogy and learn how scope persistence works in practice.',
-      zh: '用「探險家背包」比喻理解 JavaScript Closure，學會作用域保存與實際開發應用。',
-    },
-    link: '/blog/javascript-closures',
-    uid: 'blog-3',
-  },
-  {
-    title: {
-      en: 'JavaScript Prototype System and ES6 Classes: From “Finding Dad’s Treasure Chest” to Understanding the Syntax Sugar',
-      zh: 'JavaScript 原型系統與 ES6 Class：從「找爸爸翻寶箱」到語法糖完整解析',
-    },
-    description: {
-      en: 'Using the “prototype treasure hunt” analogy, this walks through how the JavaScript prototype chain works and how ES6 classes function under the hood.',
-      zh: '透過「找爸爸翻寶箱」的比喻理解 JavaScript Prototype Chain 與 ES6 Class 的運作原理。',
-    },
-    link: '/blog/javascript-prototype-system',
-    uid: 'blog-4',
-  },
-  {
-    title: {
-      en: 'The JavaScript this Keyword Fully Explained: The 5 Binding Rules and Practical Use Cases',
-      zh: 'JavaScript this 關鍵字徹底解析：5 大綁定規則與實際應用',
-    },
-    description: {
-      en: 'Understand how the JavaScript this keyword works through the five binding rules and practical examples.',
-      zh: '透過五大綁定規則與實例解析 JavaScript this 的指向與實際應用。',
-    },
-    link: '/blog/javascript-this-keyword',
-    uid: 'blog-5',
+    link: '/blog/js-reference-and-copy',
+    uid: 'blog-js-reference-and-copy',
   },
   // {
   //   title: {

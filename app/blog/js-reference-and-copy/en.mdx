@@ -1,0 +1,579 @@
+# Are JavaScript Objects Really Copied? From References and Shallow Copies to React State
+
+## TL;DR
+
+In JavaScript, assigning an object to another variable does **not** copy the object. It only copies the **reference** pointing to that object. The spread operator (`{ ...obj }`, `[...arr]`) creates a new container only at the first level; nested objects and arrays are still shared between the original and the copy. `JSON.parse(JSON.stringify())` can corrupt or lose values such as `Date`, `Map`, and `undefined`. `structuredClone()` is a much more reliable way to perform a deep clone, but even it cannot clone everything.
+
+React uses `Object.is` to compare new and previous state and props. What matters is whether the **reference changed**, not whether the contents look the same. So the correct way to update React state is not to deep-clone everything. Instead, avoid direct mutation, create new references only along the path that actually changed, and reuse existing references for everything else. Understanding the difference between **same content** and **same reference** is also essential for understanding `React.memo`, `useMemo`, and dependency arrays.
+
+---
+
+## 1. Why Does Changing copy Also Change user?
+
+Consider a piece of code almost everyone has written at some point:
+
+```js
+const user = {
+  name: 'Joey'
+}
+
+const copy = user
+
+copy.name = 'Alex'
+
+console.log(user.name) // 'Alex'
+```
+
+We declared two variables and only modified `copy`, yet `user.name` also became `'Alex'`.
+
+This is not a bug. It is simply how JavaScript handles objects: `const copy = user` **never copied an object in the first place.**
+
+### Lockers and Claim Tickets
+
+Imagine a train-station locker. You put your luggage inside a locker, and the attendant gives you a claim ticket. When you want to retrieve your luggage later, what you are holding is not the luggage itself — it is the ticket that tells you which locker to open.
+
+There are three characters in this analogy, and they will appear throughout the article:
+
+* **The locker**: the actual object stored in memory.
+* **The claim ticket**: the reference held by a variable. It tells you which locker to open.
+* **The attendant**: the person responsible for checking whether a locker has changed. How this attendant decides that — and why they sometimes miss changes — will become important once React enters the picture.
+
+With this model, `const copy = user` becomes much clearer: **you are simply photocopying the claim ticket.**
+
+Both tickets contain the same locker number. No matter which ticket you use, you are opening the same locker. So when you set `copy.name = 'Alex'`, you open the locker and replace something inside it. Later, when you use the `user` ticket to open the locker, you naturally see `'Alex'` as well.
+
+```
+user ─────┐
+          ↓
+   { name: 'Joey' }
+          ↑
+copy ─────┘
+```
+
+Assignment copies the ticket, not the locker.
+
+### Why Don't Primitives Have This Problem?
+
+Now try the same thing with a number:
+
+```js
+let a = 1
+let b = a
+
+b = 2
+
+console.log(a) // 1
+```
+
+A useful mental model is:
+
+* **Primitive values** such as numbers, strings, and booleans are held directly by the variable.
+* **Objects, arrays, and functions** are accessed through references.
+
+Strictly speaking, JavaScript assignment always copies the value stored in the variable. The important distinction is that, for objects, the value stored in the variable is itself a reference. This behavior is sometimes described as **call by sharing**: two variables can share access to the same object, and if one variable changes that object, the other sees the change too. **Primitives do not behave this way because primitive values themselves cannot be mutated — what looks like a modification is actually the creation of a new value.**
+
+### Changing What's Inside the Locker vs. Getting a New Ticket
+
+There is another case that is easy to confuse with mutation:
+
+```js
+let user = { name: 'Joey' }
+let copy = user
+
+copy = { name: 'Alex' }
+
+console.log(user.name) // 'Joey'
+```
+
+This time, `user` is completely unaffected. That's because `copy = { ... }` does not open the old locker and modify its contents. Instead, `copy` receives a completely new ticket pointing to a completely new locker.
+
+| Code | Locker analogy | What changes? |
+| --- | --- | --- |
+| `copy.name = 'Alex'` | Open the locker and change what's inside | Every variable pointing to that locker sees the change |
+| `copy = { ... }` | Get a new claim ticket | Only `copy` changes |
+
+Passing an object into a function works the same way: the function parameter receives a photocopied claim ticket. If the function modifies a property on the object, the caller sees the change. But if the function reassigns the parameter to a completely new object, the caller's reference remains unchanged.
+
+This difference between **changing the contents** and **changing the reference** will come up repeatedly.
+
+**🚨 Common Mistake: Treating `=` Like a Backup**
+
+```js
+const defaultValues = { name: '', email: '' }
+
+const formData = defaultValues // assumed to be a separate copy
+formData.name = 'Joey'
+
+// User clicks "Reset"
+resetForm(defaultValues) // defaultValues.name is already 'Joey'
+```
+
+`formData` and `defaultValues` hold the same claim ticket. So while editing the form, you also modified the supposed default values, and the Reset button no longer has anything to reset to.
+
+The same problem often appears inside helper functions. A function such as `normalize(user)` may directly mutate `user` and return it, silently changing the caller's original object. These bugs are especially difficult to debug because the mutation may happen in one part of the application while the symptoms appear much later somewhere completely unrelated.
+
+---
+
+## 2. What Does a Shallow Copy Actually Copy?
+
+Once people discover that `=` does not copy an object, the next thing they often try is the spread operator:
+
+```js
+const user = {
+  name: 'Joey',
+  address: {
+    city: 'Taipei'
+  }
+}
+
+const copy = { ...user }
+
+copy === user                 // false
+copy.address === user.address // true
+```
+
+The first comparison returns `false`, which means the outer object really is new. But the second comparison returns `true` — `address` is still the exact same object. That is the core idea behind a **shallow copy**.
+
+Using the locker analogy, `{ ...user }` **creates a new locker and copies everything from the old locker into it**:
+
+* `name` is a string, so it goes straight into the new locker.
+* `address` is another object — a second locker. The outer object does not contain that second locker itself, only its claim ticket. So when the outer object is copied, the claim ticket is copied too.
+
+```
+user ──→ {
+           name: 'Joey',
+           address ─────┐
+         }              ↓
+                 { city: 'Taipei' }
+                        ↑
+copy ──→ {              │
+           name: 'Joey',│
+           address ─────┘
+         }
+```
+
+That is why these two operations behave differently:
+
+```js
+copy.name = 'Alex'          // Only copy changes; user.name is still 'Joey'
+copy.address.city = 'Tokyo' // user.address.city also becomes 'Tokyo'
+```
+
+Arrays behave the same way: `[...arr]` creates a new outer array, but any objects inside it are still shared. `Object.assign({}, obj)`, `arr.slice()`, and `Array.from(arr)` are also shallow-copy operations.
+
+The deeper the structure becomes, the easier it is to forget this:
+
+```js
+const state = {
+  user: {
+    profile: { name: 'Joey' }
+  }
+}
+
+const nextState = { ...state }
+
+nextState === state                           // false
+nextState.user === state.user                 // true
+nextState.user.profile === state.user.profile // true
+```
+
+Spread only replaces the outermost locker. Everything below it still points to the original lockers.
+
+One additional detail: object spread copies only an object's own enumerable properties and does not preserve the prototype. So if you spread a class instance with `{ ...instance }`, you get a plain object without the original prototype methods. Getters are also evaluated during the copy, and their returned values are copied as ordinary properties.
+
+**🚨 Common Mistake: Assuming "Spread First, Then Modify" Is Always Safe**
+
+```js
+const draft = { ...settings }
+draft.notifications.email = false
+```
+
+The user clicks **Cancel**, expecting the original settings to remain unchanged. But `settings.notifications.email` has already been changed. The draft only isolated the first level — the nested data was shared the entire time.
+
+---
+
+## 3. Why Does React State Care About References?
+
+Now the locker attendant finally becomes important. Consider this common mistake — a page with a name and a counter:
+
+```jsx
+function Profile() {
+  const [user, setUser] = useState({ name: 'Joey' })
+  const [count, setCount] = useState(0)
+
+  function rename() {
+    user.name = 'Alex' // ❌ Direct mutation
+    setUser(user)      // Same object reference
+  }
+
+  return (
+    <div>
+      <p>Name: {user.name}</p>
+      <p>Count: {count}</p>
+      <button onClick={rename}>Rename</button>
+      <button onClick={() => setCount(count + 1)}>+1</button>
+    </div>
+  )
+}
+```
+
+When `setUser` is called, React compares the previous state and the next state using `Object.is`. Here, you pass the exact same object back to React. The comparison says the value is the same, so React skips the update.
+
+Back to the analogy: **React's attendant does not open the locker to inspect its contents — they only compare the claim tickets.** You secretly changed something inside the locker but handed back the exact same ticket. From the attendant's perspective, nothing changed.
+
+React works this way for a reason. Comparing two references is constant-time work, but determining whether two entire object trees contain exactly the same data could require recursively walking through every property — and the larger the data, the more expensive that becomes. In exchange, developers have to follow one important rule: **if something changed, give React a new reference.**
+
+### The UI May Update at an Unexpected Time
+
+The problem is not merely that the UI "doesn't update." Try these operations in sequence:
+
+| Step | Action | `user.name` inside the object | UI |
+| --- | --- | --- | --- |
+| 0 | Open the page | Joey | Name: Joey, Count: 0 |
+| 1 | Click **Rename** | Alex | Name: Joey, Count: 0 |
+| 2 | Click **+1** | Alex | Name: Alex, Count: 1 |
+
+When you click **Rename**, the object itself actually changes — React simply does not re-render. Later, when `count` changes, React renders the component for an unrelated reason. At that point, the component reads the already-mutated `user` object and suddenly displays `'Alex'`.
+
+So the behavior becomes: **click Rename and nothing happens; click +1 and the name suddenly changes.** It's like a swapped item going unnoticed until the attendant opens the locker for some other reason. The mutation happened much earlier than the visible symptom, which makes this type of bug much harder to diagnose than a simple failed update.
+
+### "Skipping the Update" Does Not Necessarily Mean the Component Never Runs
+
+Suppose we add logging to `Profile` and render a child component:
+
+```jsx
+function Profile() {
+  console.log('Profile executed')
+  // ...same as above
+  return (
+    <div>
+      {/* ... */}
+      <Child />
+    </div>
+  )
+}
+
+function Child() {
+  console.log('Child executed')
+  return <p>Child component</p>
+}
+```
+
+After clicking **Rename**, the console may sometimes show:
+
+```
+Profile executed
+```
+
+without `Child executed`, and without any visible UI update. React may invoke the component function before determining that the state is unchanged and bailing out of the rest of the update. This is expected behavior, not a bug. So the most accurate statement is: passing the same reference back allows React to **skip the update**, but it **does not guarantee that the component function will never be invoked**.
+
+### The Correct Approach
+
+Create a new object:
+
+```js
+setUser({ ...user, name: 'Alex' })
+```
+
+A new object means a new locker and a new claim ticket. React compares the references and immediately sees that something changed.
+
+> Mutation changes the original object; an immutable update creates a new reference.
+
+**🚨 Common Mistake**: Directly mutating a state object and then calling its setter can cause the UI to remain stale — or suddenly update later when some unrelated state causes a render. The location of the bug and the location of the symptom are different, which makes the behavior appear random.
+
+---
+
+## 4. How Should Nested State Be Updated?
+
+After learning to spread the outer object, it is easy to write code like this:
+
+```js
+const [user, setUser] = useState({
+  name: 'Joey',
+  address: { city: 'Taipei' }
+})
+
+function moveToTokyo() {
+  const nextUser = { ...user }
+  nextUser.address.city = 'Tokyo'
+  setUser(nextUser)
+}
+```
+
+Interestingly, **the UI may actually update**. Because `nextUser !== user`, the attendant sees a new claim ticket and React re-renders normally. That is exactly why this bug can remain hidden for so long: the code appears to work.
+
+The real problem is that `nextUser.address === user.address`. You created a new outer locker, but then opened the old `address` locker and modified it. Anything watching only the `address` reference cannot detect the change:
+
+```jsx
+const AddressCard = memo(function AddressCard({ address }) {
+  return <p>{address.city}</p>
+})
+
+<AddressCard address={user.address} />
+// The address reference didn't change, so memo skips rendering — the UI is stuck on Taipei
+
+useEffect(() => {
+  syncAddress(user.address)
+}, [user.address])
+// The dependency didn't change, so the effect doesn't run
+```
+
+There is another problem too: you mutated the previous state. If you stored the previous state for an undo feature, you may discover that the previous state's city has also become `'Tokyo'`.
+
+The correct approach is to create new objects along every level of the path that changed:
+
+```js
+setUser({
+  ...user,
+  address: {
+    ...user.address,
+    city: 'Tokyo'
+  }
+})
+```
+
+After the update, here's what's new and what's still shared:
+
+```
+user (new)
+ ├─ name          ← reused
+ └─ address (new)
+     └─ city: 'Tokyo'
+```
+
+Now `address` also has a new reference, so both `AddressCard` and the effect can correctly detect the change.
+
+When state becomes more than two or three levels deep, repeatedly spreading every level becomes verbose and easy to get wrong. Two common solutions are **flattening the state structure**, which React's documentation recommends, or using a library such as **Immer**, which lets you write mutation-like syntax while internally producing immutable updates.
+
+**🚨 Common Mistake**: Spreading only the outer object while mutating a nested one. The main component may update correctly while memoized children fail to update, effects watching nested references fail to run, and undo history becomes corrupted — and all of those failures can appear far away from the line that actually caused the mutation.
+
+---
+
+## 5. Arrays Have the Same Problem
+
+A common use case for array state is a list — for example, toggling a todo item:
+
+```js
+// ❌ The outer array is new, but next[index] is still the original object
+const next = [...todos]
+next[index].done = !next[index].done
+setTodos(next)
+```
+
+This is exactly the same trap as the previous section. The new array is a new locker arrangement, but each slot still contains the claim ticket for the original todo object. So modifying `next[index].done` also modifies the original todo. If `TodoItem` uses `memo`, the `todo` reference it receives is unchanged, so it may skip rendering.
+
+The correct approach is to use `map` and replace only the item that changed:
+
+```js
+setTodos(todos.map(todo =>
+  todo.id === id ? { ...todo, done: !todo.done } : todo
+))
+```
+
+The modified item gets a new locker; every unchanged item keeps its original claim ticket.
+
+Another thing to remember is that **some array methods mutate the array itself**:
+
+| Mutates the original array | Returns a new array |
+| --- | --- |
+| `push`, `pop`, `shift`, `unshift` | `concat`, `[...arr, item]` |
+| `splice` | `slice`, `filter`, `toSpliced` |
+| `sort`, `reverse` | `toSorted`, `toReversed` |
+| `arr[i] = x`, `fill` | `map`, `with(i, x)` |
+
+`toSorted`, `toReversed`, `toSpliced`, and `with` were added in ES2023 and are supported by modern browsers. If you need to support older environments, check compatibility first.
+
+Writing `todos.sort()` directly during render mutates the state array. Use `[...todos].sort()` or `todos.toSorted()` instead. Sorting only changes the order of the array and does not modify the objects inside it, so a shallow copy is sufficient here.
+
+**🚨 Common Mistake**: Spreading with `[...todos]` and then mutating an item inside it, or calling `sort` or `reverse` directly on state. Typical symptoms include list items getting out of sync or ordering changes mysteriously "sticking" to the original data.
+
+---
+
+## 6. Deep Cloning Is Not a React Silver Bullet
+
+After everything above, it is natural to think: "Why not just deep-clone the entire state every time?"
+
+That solves one problem by creating another. A deep clone replaces **every level and every object** with a new reference. From the attendant's perspective, the entire locker room has been replaced:
+
+* Every memoized child receiving those objects sees new props.
+* Every effect depending on an object reference sees a changed dependency.
+* The entire object tree must be copied on every update, and the larger the state, the slower it gets.
+
+In other words, a deep clone creates objects with the same contents but different references — precisely the situation React's change detection is worst at handling.
+
+What React state actually needs is this:
+
+> **Create new references only along the path that changed.**
+
+```
+state (new)
+ ├─ user (new)
+ │   └─ address (new)
+ │       └─ city: 'Tokyo'  ← actual change
+ ├─ settings   ← reuse existing reference
+ └─ todos      ← reuse existing reference
+```
+
+Only the branch containing the change gets new lockers; everything that did not change keeps its old claim ticket. React can tell exactly which parts changed, while unchanged children can safely skip rendering. This technique is called **structural sharing**, and libraries such as Immer and Redux Toolkit are built around it.
+
+**🚨 Common Mistake**: Using deep cloning as a substitute for proper immutable updates. The data may be logically correct, but `memo` stops working, effects retrigger unnecessarily, and large state trees are fully copied on every update.
+
+---
+
+## 7. JSON Cloning vs. structuredClone
+
+Deep cloning still has legitimate use cases outside ordinary React state updates — for example, completely isolating an editable draft from its original object, or creating independent test data. In those cases, choosing the right tool matters.
+
+### JSON.parse(JSON.stringify())
+
+This is probably the first solution many developers learn. Using the locker analogy, it is like **writing down everything inside the locker on a text inventory, then buying everything again from that inventory**. The inventory can only represent JSON-compatible data, so anything it cannot represent disappears or changes form:
+
+```js
+const original = {
+  createdAt: new Date('2026-10-02'),
+  tags: new Set(['js', 'react']),
+  note: undefined,
+  scores: [undefined, NaN, Infinity],
+  format() {}
+}
+
+const copy = JSON.parse(JSON.stringify(original))
+// {
+//   createdAt: '2026-10-02T00:00:00.000Z', ← Date becomes a string
+//   tags: {},                              ← Set becomes an empty object
+//   scores: [null, null, null]             ← special values become null
+// }
+// note and format disappear entirely
+```
+
+| Original value | Result |
+| --- | --- |
+| `undefined`, function | Removed from objects; becomes `null` inside arrays |
+| `Date` | Becomes an ISO string |
+| `Map`, `Set` | Becomes `{}` |
+| `NaN`, `Infinity` | Becomes `null` |
+| Circular reference, `BigInt` | Throws `TypeError` |
+
+None of this is a bug. JSON is a data interchange format — it was never designed to be a universal object-cloning mechanism.
+
+### structuredClone()
+
+`structuredClone()` is a built-in deep-cloning API available in browsers and Node.js 17+. It supports `Date`, `Map`, `Set`, `RegExp`, typed arrays, and circular references:
+
+```js
+const copy = structuredClone(original)
+
+copy.createdAt instanceof Date // true
+copy.tags instanceof Set       // true
+```
+
+It is more like **hiring a professional moving company to duplicate the entire locker**. But even professional movers have restrictions — some things they won't move, and others lose some of their original behavior:
+
+* **Functions**: throw `DataCloneError`. So the `original` example above would actually fail because it contains `format()` — you'd need to remove the method first.
+* **DOM nodes**: also throw `DataCloneError`.
+* **Class instances**: lose their prototype and become ordinary objects, so their methods are gone.
+* **Getters and setters**: property descriptors are not preserved.
+
+So `structuredClone()` is a significantly better deep clone than the JSON technique — but only for the types it supports.
+
+> Being able to deep-clone something does not mean every React state update should use a deep clone.
+
+**🚨 Common Mistake**: If you clone an object containing a `Date` using JSON, calling `copy.createdAt.getTime()` later fails with `getTime is not a function`, because `createdAt` is now a string. Switching to `structuredClone()` solves that — but if the object contains a function, cloning fails immediately with `DataCloneError`.
+
+---
+
+## 8. Reference Equality and React Performance
+
+References do more than determine whether state updates are detected. They also determine whether React can skip unnecessary renders.
+
+```jsx
+const Child = memo(function Child({ config }) {
+  // ...
+})
+
+function Parent() {
+  const [count, setCount] = useState(0)
+  const config = { theme: 'dark' }
+
+  return <Child config={config} />
+}
+```
+
+`memo` compares previous and next props using `Object.is`. The problem is that every time `Parent` renders, `const config = { theme: 'dark' }` runs again and creates a brand-new object:
+
+```js
+previousConfig !== nextConfig // same contents, different reference
+```
+
+It's like **opening a brand-new locker every time and putting the exact same contents inside it**. The attendant only checks the ticket, so every time they conclude: something changed. As a result, changing `count` also causes `Child` to render, and `memo` becomes effectively useless.
+
+There are three common solutions:
+
+```jsx
+// 1. When the value is static, move it outside the component
+const config = { theme: 'dark' }
+
+// 2. When it depends on other values, keep the reference with useMemo
+const config = useMemo(() => ({ theme }), [theme])
+
+// 3. Pass primitives instead and sidestep the problem entirely
+<Child theme="dark" />
+```
+
+Dependency arrays follow the same rule. With `useEffect(() => { ... }, [config])`, if `config` is recreated on every render, the effect runs after every render too.
+
+Functions behave the same way. As mentioned in Section 1, functions are also accessed through references, and an inline function created inside a component is recreated every time the component renders:
+
+```jsx
+function Parent() {
+  const handleSave = () => {
+    save(draft)
+  } // a new function on every render
+
+  return <Child onSave={handleSave} />
+}
+```
+
+Even if `Child` uses `memo`, `onSave` is a new reference every time, so `memo` still fails to prevent the render. That is what `useCallback` is designed to address — it keeps the same function reference as long as its dependencies haven't changed:
+
+```js
+const handleSave = useCallback(() => {
+  save(draft)
+}, [draft])
+```
+
+You can think of it as the function version of `useMemo`: `useMemo` preserves the reference of a calculated **result**, while `useCallback` preserves the reference of the **function itself**.
+
+But dependency arrays must include every reactive value used by the function. If a dependency is omitted, the function may keep reading an older value captured when it was created. That problem is known as a **stale closure**, and it is one of the most common mistakes involving `useCallback`.
+
+Two important caveats:
+
+1. **Not every unnecessary render needs optimization.** `memo`, `useMemo`, and `useCallback` have their own comparison and bookkeeping costs. Optimize when there is an actual performance reason.
+2. **React Compiler changes how much manual memoization is necessary.** In projects using React Compiler, many of these memoization patterns are handled automatically, which greatly reduces the need for hand-written `useMemo` and `useCallback`. But the compiler still relies on code following React's rules — especially avoiding direct mutation — and reference identity still matters. Understanding references explains both why the compiler works and when it cannot safely optimize your code.
+
+> In React, "same content" and "same reference" are two completely different things.
+
+**🚨 Common Mistake**: Adding `memo` to a child component while passing it a newly created object or function on every parent render. The optimization does nothing, while you still pay the extra cost of comparing props.
+
+---
+
+## 9. Final Recap: Copy, Mutation, and Identity
+
+Let's return to the original question: why does changing `copy` also change `user`?
+
+Because `const copy = user` only photocopies the claim ticket — both tickets still open the same locker. Every cloning technique differs mainly in one question: which lockers are new, and which are still shared?
+
+| Operation | Locker analogy | New top-level reference? | New nested objects? |
+| --- | --- | --- | --- |
+| `b = a` | Photocopy the claim ticket | No | No |
+| `a.x = 1` (mutation) | Open the locker and modify its contents | No | No |
+| `{ ...a }`, `[...arr]` (shallow copy) | New locker, but nested claim tickets are copied | Yes | No |
+| `JSON.parse(JSON.stringify(a))` | Rebuild everything from a written inventory | Yes | Yes, but some types are lost or corrupted |
+| `structuredClone(a)` | Professionally duplicate the entire locker | Yes | Yes, for supported types |
+| Immutable update along the changed path | Open new lockers only along the changed branch | Yes | Only along the changed path |
+
+React's attendant only compares claim tickets. That means mutation can cause React to miss a real change, deep cloning can make React think everything changed, and creating new objects on every render can make `memo` useless. All three problems come from the same underlying misunderstanding: **not knowing when references are equal and when they are different.**
+
+> The most important lesson about shallow and deep copies isn't "how many levels were copied?" — it's understanding reference identity, and which pieces of data still share the same reference.
+
+> **For React state, the goal is not to deep-clone everything. The goal is to avoid direct mutation and create new references only along the data path that actually changed.**

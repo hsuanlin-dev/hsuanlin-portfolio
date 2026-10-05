@@ -1,0 +1,474 @@
+# 從 Browser Rendering 到 React Reconciliation：畫面更新的完整流程
+
+## TL;DR
+
+在 React 開發中，React render、DOM update、browser rendering 與 paint 常被籠統地稱為「畫面更新」。
+
+但它們其實分屬不同的層級：
+
+**React 負責計算 UI 應該變成什麼樣子，DOM 承載實際變更，瀏覽器則負責把這些結果真正繪製到螢幕上。**
+
+一次 state update 要真正出現在使用者眼前，必須經過這幾個不同階段。
+
+把它們混在一起的問題，通常不是程式寫不出來，而是效能問題很容易從一開始就判斷錯方向：例如把 re-render 誤認為 repaint，於是到處加入 `memo`；或是不清楚 `useLayoutEffect` 為什麼可能阻塞畫面。
+
+整篇文章如果只記得一句話，可以記這句：
+
+> **React 負責決定 DOM 怎麼改；瀏覽器負責把 DOM 真正變成畫面。**
+
+---
+
+## 1. 先從問題開始：畫面更新其實不是一件事
+
+在 React 裡，讓畫面上的數字加一，只需要一行：
+
+```js
+setCount(count + 1)
+```
+
+這行程式碼太常見，常見到我們很少停下來追問它背後到底發生了什麼。
+
+但只要認真想一下，就會冒出兩個問題：
+
+* **執行 `setCount` 之後，React 會立刻修改 DOM 嗎？**
+* **DOM 改變之後，瀏覽器又會立刻把新的 pixel 畫到螢幕上嗎？**
+
+之所以容易混淆，是因為我們平常會把 React render、DOM update、browser rendering、paint 全部稱為「更新畫面」，彷彿只是同一件事情的不同名稱。
+
+實際上，它們屬於不同階段，也由不同角色負責。
+
+可以把整個過程想像成一間室內設計公司接到改裝案。
+
+屋主提出需求後，設計師先重新畫設計圖；確認該改哪些地方之後，施工隊才真正進場施工；最後屋主才看到完成後的新空間。
+
+**設計圖畫好了，不代表房子已經改好了；房子改好了，也不代表畫面已經呈現在眼前。**
+
+接下來先把 React 放到一旁，從最底層開始：
+
+**瀏覽器究竟是怎麼把 HTML 變成畫面的？**
+
+---
+
+## 2. 沒有 React 以前：瀏覽器怎麼把 HTML 變成畫面
+
+不論前端框架怎麼演進，最後真正負責把內容呈現在螢幕上的，仍然是瀏覽器。
+
+如果先用一個簡化模型來看，**Browser Rendering Pipeline** 大致可以理解成：
+
+```
+HTML           CSS
+ ↓              ↓
+DOM           CSSOM
+  └──────┬──────┘
+         ↓
+    Render Tree
+         ↓
+       Layout
+         ↓
+       Paint
+         ↓
+     Composite
+         ↓
+       Screen
+```
+
+不同瀏覽器引擎的實際內部實作會更複雜，但這個模型已經足以理解大多數前端效能問題。
+
+### DOM 與 CSSOM
+
+瀏覽器解析 HTML，建立樹狀結構的 **DOM**；解析 CSS，建立 **CSSOM**。這時瀏覽器手上有兩份資料：一份是「頁面有哪些東西」，一份是「這些東西長什麼樣子」。
+
+### Render Tree：真正需要被畫出來的內容
+
+DOM 與 CSSOM 的資訊會共同影響最後需要繪製的結構。關鍵是：**DOM 不等於最後一定會被畫出來的東西。** 例如：
+
+```css
+.modal {
+  display: none;
+}
+```
+
+這個元素仍然存在 DOM 中，JavaScript 也可以找到它，但因為它不需要出現在畫面上，因此不會參與正常的 layout 與 paint。
+
+### Layout：計算位置與大小
+
+Layout 計算每個節點的寬高與座標。以前常聽到的 **reflow（重排）** 指的就是這一類工作。一個元素的尺寸變化，往往會連帶影響周圍甚至整頁的排版，所以它是整條流程中成本較高的一步。
+
+### Paint：決定怎麼畫
+
+**Paint** 決定背景、邊框、文字、陰影要怎麼畫。如果說 Layout 是決定「東西放在哪裡」，Paint 就是在決定「它應該被畫成什麼樣子」。
+
+### Composite：組合最終畫面
+
+現代瀏覽器可能把部分內容分到不同的 layer 中處理，最後再由 Composite 將它們組合成使用者看到的畫面。Layer 的切分與實際繪製流程屬於瀏覽器引擎的實作細節，這裡只需要先記住：**Composite 是內容真正出現在螢幕前的最後幾個重要階段之一。**
+
+---
+
+## 3. JavaScript 改 DOM 時發生什麼？
+
+上面描述的是頁面第一次載入的過程。當 JavaScript 在頁面顯示後修改 DOM，又會發生什麼事？
+
+```js
+element.textContent = 'Hello'
+element.style.width = '500px'
+```
+
+執行完這兩行，DOM 確實已經改變，馬上讀取 `element.textContent` 就會拿到 `'Hello'`。但：
+
+> **改 DOM ≠ 畫面瞬間更新。**
+
+```js
+box.style.width = '100px'
+box.style.width = '200px'
+box.style.width = '300px'
+```
+
+如果瀏覽器每次 DOM 改動都立刻 repaint，理論上使用者應該看到方塊一路從 `100px` → `200px` → `300px`。但實際上通常只會看到最後的 `300px`。
+
+原因之一在於 JavaScript 的執行與瀏覽器的許多 rendering 工作都需要使用主執行緒。當 JavaScript 還在執行時，瀏覽器通常不會在每一行程式碼之間插入一次完整繪製。因此可以先記住：
+
+> **瀏覽器通常會等 JavaScript 執行告一段落、主執行緒重新有機會處理 rendering 工作時，再進行後續的 style calculation、layout、paint 等流程。**
+
+就像施工過程中，不會每移動一張椅子就重新拍一張完工照。
+
+之所以說「通常」，是因為修改樣式後立刻讀取 `offsetWidth` 這類版面數值，會逼瀏覽器當下同步執行 Layout（強制同步排版）。但即使如此，**畫面依然要等 JavaScript 執行完畢才會 paint 到螢幕上**。
+
+到這裡，我們已經可以回答開頭的第二個問題：
+
+> **DOM 改變後，新的 pixel 不一定會立刻出現在螢幕上。**
+
+---
+
+## 4. React 加進來之後，多了一層什麼？
+
+在 React 裡，我們幾乎不會直接寫 `element.textContent = ...`，而是呼叫 `setState`。理解這一層之前，得先記住整篇最重要的一句話：
+
+> **React 並沒有取代 browser rendering。React 做的是決定 DOM 應該怎麼改。**
+
+React 不會自己把 pixel 畫到螢幕上，它只是站在瀏覽器前面，算出「DOM 應該變成什麼樣子」，再把結果交給瀏覽器。流程變成：
+
+```
+State update
+    ↓
+React render              ┐
+    ↓                     │
+Reconciliation            │ React 的工作
+    ↓                     │
+Commit                    ┘
+    ↓
+Real DOM changes
+    ↓
+Browser rendering         ┐
+    ↓                     │ 瀏覽器的工作
+Layout / Paint / Composite┘
+```
+
+下半段就是第 2 節的瀏覽器 pipeline，一點都沒有改變。接下來三節，逐一拆開 React 負責的上半段。
+
+---
+
+## 5. React 的 Render Phase 到底在做什麼？
+
+首先要釐清一個最常見的誤會：
+
+> **React 說的「render」，不是把東西畫到螢幕上。**
+
+React render 指的是執行 component function，根據當下的 props 與 state，產生新的 React element tree，描述 UI 應該長什麼樣子。就像設計師**重新畫一張設計圖**，房子本身一根釘子都還沒動。
+
+```jsx
+function Counter() {
+  const [count, setCount] = useState(0)
+
+  return <div>{count}</div>
+}
+```
+
+當 `count` 改變，React 會再次呼叫 `Counter()`，拿到一份新的描述。但要特別注意：
+
+> **component function 被執行 ≠ DOM 一定被修改。**
+
+Render Phase 產出的只是一份「計畫」，最後可能需要改動 DOM，也可能和上一版完全一樣。也因為 render 只是計算，React 要求 component 必須是**純函式**，不能在 render 過程中直接操作 DOM。
+
+這也回答了開頭的第一個問題：**呼叫 `setCount` 之後，React 不會立刻修改 DOM**。React 會先安排更新；在一般事件處理情境下，多個 state update 可能被批次處理，之後再進入 render。
+
+---
+
+## 6. Reconciliation：React 怎麼知道哪裡需要改？
+
+新的 UI 描述產生之後，React 必須判斷：**和之前相比，究竟有哪些地方需要更新？** 這就是 **Reconciliation（協調）**。React 會根據前一次與這一次的 UI 結構，判斷哪些部分應該：**保留、更新、新增**還是**移除**。
+
+```jsx
+<div>
+  <h1>Hello</h1>
+  <span>{count}</span>
+</div>
+```
+
+當只有 `count` 改變，React 會發現 `<div>` 與 `<h1>` 都沒變，只需要更新 `<span>` 裡的文字，**而不是把整棵 DOM 重建一遍**。
+
+這裡順便破除一個常見誤解：
+
+> **Virtual DOM 的概念不是「DOM 很慢，所以 React 不用 DOM」。**
+
+React 最後仍然需要把必要的改動套到真實 DOM。它用自己的資料結構描述 UI，讓開發者只需要宣告「畫面應該長怎樣」，由 React 計算出**必要的更新**。
+
+### 列表中的 key：告訴 React「誰是誰」
+
+遇到列表時，React 需要靠 `key` 判斷新舊項目是否為同一個：
+
+```jsx
+// ❌ 用 index 當 key 容易出問題
+{todos.map((todo, index) => <TodoItem key={index} todo={todo} />)}
+
+// ✅ 用穩定的唯一值當 key
+{todos.map((todo) => <TodoItem key={todo.id} todo={todo} />)}
+```
+
+**🚨 為什麼 index 可能出問題？**
+
+假設原本有：
+
+```
+key 0 → A
+key 1 → B
+```
+
+現在在列表最前面插入 X：
+
+```
+key 0 → X
+key 1 → A
+key 2 → B
+```
+
+React 看到的是：
+
+```
+key 0 仍然存在
+key 1 仍然存在
+```
+
+所以它可能把原本屬於 A 的 component identity 對應到 X，把原本屬於 B 的 identity 對應到 A。
+
+如果 component 內部帶有 local state、未受控 input 等狀態，就可能出現：「為什麼上一個 item 的狀態跑到另一個 item？」這也是為什麼 `key` 真正重要的不是「唯一」而已，而是：**在資料前後變化時仍然保持穩定。**
+
+---
+
+## 7. Commit Phase：這時候才真的碰 DOM
+
+Render Phase 算出新的 UI 描述，Reconciliation 判斷需要改什麼之後，React 才會進入 Commit Phase。也就是說工單寫好後，施工隊才真正進場。這一節要把兩個階段清楚分開：
+
+* **Render phase**：React 計算「應該改什麼」。
+* **Commit phase**：React 真正把改動套到 DOM。
+
+```
+Render:
+  count 0 → 1
+  React 判斷 <span> 的文字需要修改
+
+Commit:
+  real DOM:
+  <span>0</span>  →  <span>1</span>
+```
+
+Render 只負責計算，不會碰 DOM。**DOM 只會在 Commit 階段被修改**，而且所有變更會一次套用完畢，使用者不會看到改到一半的畫面。
+
+如果 Render 算完發現畫面跟上次一樣，Commit 就沒有東西要改，DOM 也就不會變。
+
+> **React render ≠ DOM update**
+>
+> Render 是「算出畫面該長怎樣」，DOM update 是「真的去改頁面」。
+
+---
+
+## 8. DOM 改完，畫面還沒結束
+
+Commit 完成後，DOM 已經反映最新狀態。但整件事情仍然沒有結束。因為：**DOM 已經改變，不代表新的畫面已經出現在螢幕上。** 接下來工作重新交回瀏覽器：
+
+```
+DOM updated
+    ↓
+Style calculation
+    ↓
+Layout（如果需要）
+    ↓
+Paint（如果需要）
+    ↓
+Composite
+    ↓
+Screen
+```
+
+瀏覽器會**依照改動類型決定從哪一步開始**：改寬高或位置需要重新 Layout；只改某些純視覺屬性，例如顏色，可能不需要重新 Layout；而像 `transform` 或 `opacity`，在合適條件下，常有機會避開部分較昂貴的 Layout / Paint 工作，而主要由 compositing 處理。這也是為什麼做高頻動畫時，`transform` 通常比持續修改 `top` / `left` 更適合。
+
+把所有環節串起來，就是一次畫面更新的完整流程：
+
+```
+User interaction
+      ↓
+Event handler
+      ↓
+setState
+      ↓
+React schedules update
+      ↓
+Render phase               ┐
+      ↓                    │
+Reconciliation             │ React
+      ↓                    │
+Commit phase               ┘
+      ↓
+DOM mutation
+      ↓
+Browser rendering pipeline ┐
+      ↓                    │
+Layout                     │
+      ↓                    │ Browser
+Paint                      │
+      ↓                    │
+Composite                  ┘
+      ↓
+User sees new UI
+```
+
+這就是整篇文章真正想拆開的事情：**Browser → DOM → React → DOM → Browser → Pixel**。
+
+---
+
+## 9. 為什麼 React re-render 不等於 DOM update？
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0)
+  return <Child />
+}
+```
+
+當 `Parent` 的 state 改變，預設情況下 `Child` 也會重新執行。但有可能 `Child` 這次產生的 UI 和前一次比較沒有差異，就不需要套用到 DOM 上更新：
+
+```
+React re-render    ✓ 有發生
+DOM mutation       ✗ 不一定（Reconciliation 沒發現差異）
+Browser repaint    ✗ 也不一定（DOM 沒變，瀏覽器就沒事做）
+```
+
+如果把 re-render 等同於「畫面重畫」，就很容易開始過早優化。
+
+例如看到 component 被重新執行，就立刻加入：
+
+```
+React.memo
+useMemo
+useCallback
+```
+
+但一般元件的 re-render 只是執行一次函式，成本通常很低；過度使用 memo 反而增加比對開銷，也讓程式碼更難維護。因此真正合理的優化流程應該是：**先確認效能成本到底發生在哪一層，再決定要優化哪一層。**
+
+這一節想帶出的，是整篇最值得帶走的觀念：
+
+> **React render、DOM mutation、browser paint 是三件不同層級的事情。**
+
+---
+
+## 10. useEffect 和 useLayoutEffect 放在哪裡？
+
+兩個 effect hook 的差別，在於**執行時機落在流程中的哪一格**：
+
+```
+React render
+    ↓
+Commit DOM
+    ↓
+useLayoutEffect   ← DOM 已更新，瀏覽器尚未繪製
+    ↓
+Browser paint
+    ↓
+useEffect         ← 通常在畫面呈現之後（不是絕對）
+```
+
+### useLayoutEffect
+
+`useLayoutEffect` 會在 **DOM 更新完成後、瀏覽器繪製畫面前**同步執行。適合用在需要先量測元素，再根據結果調整 DOM 的情境，例如：
+
+* 讀取元素的位置或尺寸
+* 根據量到的尺寸立即調整 DOM
+
+最典型的例子是 tooltip：它必須先知道自己的高度，才能決定要顯示在目標元素的上方還是下方。如果等畫面繪製後才修正，使用者會先看到 tooltip 出現在錯誤位置，下一刻才跳到正確位置。
+
+代價是，**瀏覽器必須等 `useLayoutEffect` 執行完才能繪製畫面**。所以裡面不應該放耗時的工作。
+
+### useEffect
+
+`useEffect` 適合處理**不需要擋住畫面顯示**的副作用，例如：
+
+* 發送 API 請求
+* 訂閱資料或註冊 event listener
+* 與外部系統同步
+
+一般可以把它理解成：React 完成 DOM 更新後，再找適當的時機執行。
+
+但要注意，「`useEffect` 一定在畫面繪製後執行」並不是絕對的規則。如果更新是由點擊、輸入這類使用者互動觸發，React 可能會在瀏覽器繪製前就先執行 effect。
+
+所以判斷原則很簡單：**只要邏輯必須在畫面繪製前完成，就用 `useLayoutEffect`**，不要依賴 `useEffect` 剛好在什麼時機執行。
+
+---
+
+## 11. 一個完整案例
+
+最後，用一個很簡單的例子把整篇串起來：
+
+```jsx
+function App() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>
+        Open
+      </button>
+
+      {open && <Modal />}
+    </>
+  )
+}
+```
+
+使用者點下 `Open`，到 Modal 真正出現在螢幕上，中間大致發生：
+
+```
+1.  使用者點擊按鈕
+2.  click handler 執行
+3.  呼叫 setOpen(true)
+4.  React 安排一次更新（此時 DOM 尚未改變）        → 第 5 節
+5.  App 重新 render，產生新的 element tree        → 第 5 節
+6.  React 比對前後差異：
+      上一次：Modal 不存在
+      這一次：Modal 存在
+7.  Reconciliation 判斷需要新增 Modal 的 DOM 節點  → 第 6 節
+8.  Commit phase 將 Modal 的 DOM 插入頁面         → 第 7 節
+9.  瀏覽器重新計算樣式與 Layout                   → 第 8 節
+10. 瀏覽器 Paint 與 Composite                     → 第 8 節
+11. 使用者看到 Modal
+```
+
+一次看起來幾乎瞬間完成的點擊，背後其實是 React 和瀏覽器完成的一次接力。
+
+---
+
+## 12. 最容易搞混的四件事
+
+| 名詞 | 真正在做什麼 | 主要由誰負責 |
+| --- | --- | --- |
+| React Render | 執行 component，計算 UI 應該長什麼樣子 | React |
+| Reconciliation | 根據前後 UI 描述判斷需要保留、更新、新增或移除哪些部分 | React |
+| Commit | 把必要變更真正套用到 DOM | React |
+| Browser Rendering | 將 DOM / CSS 的結果轉換成使用者看到的畫面 | Browser |
+
+最後回到文章一開始的兩個問題：
+
+* **執行 `setCount` 之後，React 會立刻修改 DOM 嗎？** 不會。React 會先安排更新，經過 render 與 reconciliation 算出差異，直到 commit 才真正修改 DOM。
+* **DOM 改了之後，瀏覽器會立刻畫出 pixel 嗎？** 也不會。瀏覽器要等 JavaScript 讓出主執行緒，再依照改動類型決定是否重新 Layout、Paint，最後 Composite 到螢幕上。
+
+設計師畫好圖，不代表房子改好了；房子改好了，也不代表屋主已經看到。整篇文章的核心，可以濃縮成一句話：
+
+> **React 負責決定 DOM 怎麼改；瀏覽器負責把 DOM 真正變成畫面。**
