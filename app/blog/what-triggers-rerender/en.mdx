@@ -1,0 +1,728 @@
+{/* description: A React component doesn't re-render only when its props change. This article explores three common re-render paths—state updates, parent re-renders, and Context changes—and explains how React.memo works, why object and function references affect memoization, and when rendering optimizations are actually worth using. */}
+
+# What Actually Triggers a React Re-render? From Props and State to Context and React.memo
+
+## TL;DR
+
+In React, a component can re-render for several reasons: its own state changes, its parent re-renders, or a Context it consumes changes.
+
+One of the most common misconceptions is about props: **unchanged props don't guarantee that a child component won't re-render.** When a parent re-renders, React normally processes its child components again. Even if a child receives exactly the same props as before, its function may still execute.
+
+`React.memo` helps prevent unnecessary child renders caused by parent updates when the child's props haven't changed.
+
+However, `memo` doesn't prevent a component from re-rendering when its own state changes or when a Context it consumes updates. Also, if object or function props are recreated on every render, their references change — even when their contents appear identical — preventing `memo` from skipping the render.
+
+The goal isn't to minimize every possible render. It's this:
+
+> **Understand what triggered a render, then decide whether optimizing it is actually worthwhile.**
+
+---
+
+## 1. Why Does a Child Re-render When Its Props Haven't Changed?
+
+Consider this simple example:
+
+```jsx
+import { useState } from 'react'
+
+function Child({ name }) {
+  console.log('Child render')
+  return <p>{name}</p>
+}
+
+function Parent() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(c => c + 1)}>
+        count: {count}
+      </button>
+
+      <Child name="Joey" />
+    </>
+  )
+}
+```
+
+Every time the button is clicked, `count` changes and Parent re-renders. But you'll also see `Child render` appear in the console again.
+
+What's interesting is that `<Child name="Joey" />` hasn't changed at all. The `name` prop was `'Joey'` before, and it's still `'Joey'` now.
+
+**So why does Child execute again?**
+
+The confusion comes from a common but incomplete assumption:
+
+> When props change, a component re-renders.
+
+That's generally true, but it doesn't mean the reverse is also true:
+
+> If props don't change, a component won't re-render.
+
+That assumption is incorrect.
+
+To understand why, we first need to clarify what React actually means by rendering.
+
+---
+
+## 2. React Rendering Is Not the Same as Repainting the Screen
+
+In the previous article on Browser Rendering, we separated React rendering, DOM mutations, and browser painting into distinct stages.
+
+For now, the key idea is:
+
+> **React rendering is the process of calculating what the UI should look like. For function components, this typically involves executing the component function again.**
+
+For example:
+
+```jsx
+function Child({ name }) {
+  console.log('Child render')
+  return <p>{name}</p>
+}
+```
+
+When React executes `Child` again, it produces a new description of the UI and determines whether any DOM updates are necessary.
+
+But executing a component function doesn't necessarily mean the DOM changes, and it certainly doesn't mean the browser must repaint the screen.
+
+Throughout this article, when we discuss re-rendering, we're primarily asking:
+
+> Why does React need to execute this component again?
+
+Not:
+
+> Why does the browser need to repaint the screen?
+
+These processes are related, but they're not the same thing.
+
+---
+
+## 3. State: The Most Direct Cause of a Re-render
+
+Let's start with the simplest case:
+
+```jsx
+function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <button onClick={() => setCount(c => c + 1)}>
+      {count}
+    </button>
+  )
+}
+```
+
+When `setCount` is called, React receives a state update and schedules the component to update.
+
+The process can be simplified as:
+
+```
+setState
+   ↓
+React schedules an update
+   ↓
+Component re-renders
+   ↓
+Calculates the new UI
+```
+
+However, there's an important detail: **calling a state setter doesn't always result in a meaningful update.**
+
+For example:
+
+```js
+setCount(0)
+```
+
+If `count` is already `0`, React can use `Object.is` to compare the previous and next state values and skip an unnecessary update. In some situations, React may still execute the component function but discard the result.
+
+The same principle applies to objects:
+
+```js
+setUser(user)
+```
+
+If `user` still refers to the same object, React may determine that the state hasn't changed. This is why directly mutating a state object and passing the same reference back to its setter may not produce the expected update. It's also why React emphasizes keeping state immutable.
+
+In short, **a state update causes React to process an update starting from the component that owns the state, but an unchanged value may allow React to bail out.**
+
+---
+
+## 4. Parent Re-renders: Why Does a Child Execute Even When Its Props Haven't Changed?
+
+Let's return to the original example:
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(c => c + 1)}>
+        {count}
+      </button>
+
+      <Child name="Joey" />
+    </>
+  )
+}
+```
+
+When `count` changes:
+
+```
+count updates
+   ↓
+Parent re-renders
+   ↓
+React recalculates Parent's children
+   ↓
+Child also re-renders by default
+```
+
+After executing Parent, React produces a new UI description that includes `<Child name="Joey" />`. For a regular child component without memoization, React normally executes it again, even if its props are identical to the previous render.
+
+This means **a child's re-render isn't determined solely by whether its props changed.**
+
+So what role do props actually play?
+
+```jsx
+function Parent() {
+  const [name, setName] = useState('Joey')
+
+  return <Child name={name} />
+}
+```
+
+Suppose `name` changes from `'Joey'` to `'Alex'`:
+
+```
+Parent state updates
+   ↓
+Parent re-renders
+   ↓
+Creates a new Child element and props
+   ↓
+Child re-renders
+```
+
+In practice, this is often simplified to `Props changed → Child re-renders`. But technically, props aren't an independent update-scheduling mechanism like `setState`.
+
+In this example, Parent's state update initiates the process. Parent executes again, and React then processes Child.
+
+React also doesn't perform a props equality check for every regular component by default. Comparisons have their own cost, and for a simple component, executing it again may actually be cheaper.
+
+A useful mental model is:
+
+> When a parent re-renders, React normally continues processing its children. It can skip some of that work only when specific bailout conditions are met.
+
+This is exactly where `React.memo` becomes useful.
+
+---
+
+## 5. React.memo: Skipping Unnecessary Re-renders
+
+Let's wrap Child with `memo`:
+
+```jsx
+import { memo } from 'react'
+
+const Child = memo(function Child({ name }) {
+  console.log('Child render')
+  return <p>{name}</p>
+})
+```
+
+Parent remains unchanged:
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(c => c + 1)}>
+        {count}
+      </button>
+
+      <Child name="Joey" />
+    </>
+  )
+}
+```
+
+Now, clicking the button still updates `count`, causing Parent to re-render. But when React reaches the memoized Child, it compares the previous and next props:
+
+```
+Parent re-renders
+       ↓
+   React.memo
+       ↓
+ Are props equal?
+     /    \
+   Yes     No
+    ↓       ↓
+  Skip    Render
+```
+
+By default, `React.memo` compares each prop using `Object.is`. For example:
+
+```jsx
+<Child name="Joey" age={30} />
+```
+
+If both `name` and `age` are unchanged, and no other updates need to be processed, React can skip executing Child again.
+
+So the primary purpose of `memo` is:
+
+> **To avoid unnecessary child renders when the parent re-renders but the child's props haven't changed.**
+
+However, `React.memo` is a performance optimization, not a guarantee that a component will never re-render.
+
+---
+
+## 6. What React.memo Can't Prevent: State and Context Updates
+
+`React.memo` primarily handles props comparisons during parent updates. A component's own state and the Context it consumes can still trigger a re-render.
+
+### Case 1: The Child's Own State Changes
+
+```jsx
+const Child = memo(function Child({ name }) {
+  const [open, setOpen] = useState(false)
+
+  console.log('Child render')
+
+  return (
+    <>
+      <p>{name}</p>
+
+      <button onClick={() => setOpen(v => !v)}>
+        Toggle
+      </button>
+
+      {open && <div>Details</div>}
+    </>
+  )
+})
+```
+
+Even though Child is wrapped in `memo`, clicking the Toggle button causes:
+
+```
+Child state updates
+   ↓
+Child re-renders
+```
+
+This is expected and necessary because the update comes from Child's own state, not merely from its parent executing again.
+
+### Case 2: A Consumed Context Changes
+
+Suppose we have a `ThemeContext`:
+
+```jsx
+const ThemeContext = createContext('light')
+
+const Child = memo(function Child() {
+  const theme = useContext(ThemeContext)
+
+  console.log('Child render')
+
+  return <div className={theme}>Hello</div>
+})
+```
+
+App provides the Context value:
+
+```jsx
+function App() {
+  const [theme, setTheme] = useState('light')
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      <button
+        onClick={() =>
+          setTheme(t =>
+            t === 'light' ? 'dark' : 'light'
+          )
+        }
+      >
+        Change theme
+      </button>
+
+      <Child />
+    </ThemeContext.Provider>
+  )
+}
+```
+
+Even though Child has no props and is wrapped in `memo`, it still needs to re-render whenever the `ThemeContext` value changes.
+
+```
+Context value changes
+   ↓
+Consumers of that Context receive an update
+   ↓
+Child re-renders
+```
+
+The reason is straightforward: Child's props haven't changed, but the `theme` value it actually uses has. If React skipped the update simply because the props were unchanged, the UI wouldn't reflect the latest Context value.
+
+React also compares Context values using `Object.is`. If a Provider creates a new object on every render, consumers may receive updates even when the object's contents appear unchanged.
+
+At this point, we can identify three common re-render paths:
+
+```
+① A component's own state updates
+② Its parent re-renders
+③ A Context it consumes changes
+```
+
+`React.memo` primarily helps avoid unnecessary renders caused by the second path.
+
+---
+
+## 7. Why Objects and Functions Affect React.memo
+
+Now let's look at another common issue: why does a child keep re-rendering even after being wrapped in `React.memo`?
+
+Consider this example:
+
+```jsx
+const Child = memo(function Child({ config }) {
+  console.log('Child render')
+  return <div>{config.theme}</div>
+})
+
+function Parent() {
+  const [count, setCount] = useState(0)
+
+  const config = {
+    theme: 'dark'
+  }
+
+  return (
+    <>
+      <button onClick={() => setCount(c => c + 1)}>
+        {count}
+      </button>
+
+      <Child config={config} />
+    </>
+  )
+}
+```
+
+The `config` object always appears to contain the same value: `{ theme: 'dark' }`. Yet every time Parent re-renders, Child executes again.
+
+The problem isn't that `React.memo` is broken. It's that JavaScript compares objects differently from primitive values.
+
+### Primitive Values vs. Reference Equality
+
+For primitive values such as numbers and strings:
+
+```js
+1 === 1           // true
+'dark' === 'dark' // true
+```
+
+But objects, arrays, and functions are compared by reference:
+
+```js
+const a = { theme: 'dark' }
+const b = { theme: 'dark' }
+
+a === b // false
+
+const f = () => {}
+const g = () => {}
+
+f === g // false
+```
+
+These examples use `===`, which produces the same results as `Object.is` for these particular values. Two objects can have identical contents and still be considered different if they don't share the same reference.
+
+Back in Parent:
+
+```js
+const config = {
+  theme: 'dark'
+}
+```
+
+Every time Parent executes, a new object is created.
+
+```
+First render
+config → Object A
+
+Second render
+config → Object B
+
+Object A !== Object B
+```
+
+When `memo` compares the props:
+
+```
+previousConfig !== nextConfig
+   ↓
+Props are different
+   ↓
+Child re-renders
+```
+
+So `memo` is working correctly. The object reference really did change.
+
+Functions behave the same way:
+
+```jsx
+<Child onSave={() => save()} />
+```
+
+Every time Parent renders, a new arrow function is created. Even if the function body is identical, the reference is different.
+
+### useMemo and useCallback
+
+This is one situation where `useMemo` and `useCallback` can help.
+
+If `config` doesn't need to change between renders:
+
+```js
+const config = useMemo(() => ({
+  theme: 'dark'
+}), [])
+```
+
+If a callback depends on `save`:
+
+```js
+const handleSave = useCallback(() => {
+  save()
+}, [save])
+```
+
+When their dependencies remain unchanged, React can normally reuse the previously cached value or function reference. The distinction is simple:
+
+* `useMemo` caches a computed value.
+* `useCallback` caches a function reference.
+
+However, dependency arrays must include the reactive values used by the calculation or callback. They shouldn't be set to `[]` just to keep a reference stable.
+
+Also, memoization is a performance optimization, not a semantic guarantee that a reference will be preserved forever.
+
+---
+
+## 8. Are React.memo, useMemo, and useCallback Always Worth Using?
+
+Once you understand reference equality, it's tempting to think:
+
+> If changing references can cause unnecessary renders, shouldn't I wrap every object in useMemo, every function in useCallback, and every component in React.memo?
+
+Usually, no. There are three main reasons:
+
+1. **Memoization has a cost.** React needs to maintain cached values and compare dependencies or props, which also requires resources.
+2. **Stable references don't always prevent re-renders.** If Child isn't memoized, simply keeping its props references stable usually won't prevent it from re-rendering with Parent.
+3. **Overusing memoization increases complexity.** Adding memoization everywhere can make code harder to read without delivering meaningful performance improvements.
+
+For example:
+
+```jsx
+function Child({ name }) {
+  return <span>{name}</span>
+}
+```
+
+For a component this simple, rendering may be extremely cheap. Even if we change it to:
+
+```jsx
+const Child = memo(function Child({ name }) {
+  return <span>{name}</span>
+})
+```
+
+that doesn't automatically make it faster. We're essentially trading the cost of comparing props for the opportunity to skip a component render. If props change almost every time, or the component is already very cheap to render, the benefit may be negligible.
+
+In general, `React.memo` tends to be more useful when a parent re-renders frequently, the child has a meaningful rendering cost, and its props remain unchanged most of the time.
+
+Likewise, `useMemo` and `useCallback` aren't limited to supporting memoized children. They can also help avoid repeated expensive computations or maintain stable references where dependencies require them.
+
+Projects using React Compiler may also benefit from automatic memoization, reducing the need for some manual optimizations.
+
+The more reliable approach is:
+
+> **Identify an actual performance bottleneck first, then use tools such as React DevTools Profiler to determine which renders are worth optimizing.**
+
+---
+
+## 9. Putting It All Together: Identifying Re-render Sources
+
+Let's combine everything into one example. This time, we'll intentionally keep the `user` reference stable so it doesn't interfere with observing the different update sources.
+
+```jsx
+import {
+  createContext,
+  memo,
+  useContext,
+  useState
+} from 'react'
+
+const ThemeContext = createContext('light')
+
+const user = {
+  name: 'Joey'
+}
+
+const UserCard = memo(function UserCard({ user }) {
+  const theme = useContext(ThemeContext)
+  const [expanded, setExpanded] = useState(false)
+
+  console.log('UserCard render')
+
+  return (
+    <div className={theme}>
+      <p>{user.name}</p>
+
+      <button onClick={() => setExpanded(v => !v)}>
+        Toggle
+      </button>
+
+      {expanded && <p>Details</p>}
+    </div>
+  )
+})
+
+function App() {
+  const [count, setCount] = useState(0)
+  const [theme, setTheme] = useState('light')
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      <button onClick={() => setCount(c => c + 1)}>
+        {count}
+      </button>
+
+      <button
+        onClick={() =>
+          setTheme(t =>
+            t === 'light' ? 'dark' : 'light'
+          )
+        }
+      >
+        Theme
+      </button>
+
+      <UserCard user={user} />
+    </ThemeContext.Provider>
+  )
+}
+```
+
+Now let's examine three different situations.
+
+### Case 1: Count Changes
+
+```
+count updates
+   ↓
+App re-renders
+   ↓
+user reference stays the same
+   ↓
+Context value stays the same
+   ↓
+memo can skip UserCard's render
+```
+
+Because `user` is defined outside the component, it isn't recreated when App re-renders. As a result, UserCard receives the same prop reference, allowing `memo` to skip its render when no other updates are pending.
+
+### Case 2: Theme Changes
+
+```
+theme updates
+   ↓
+Context value changes
+   ↓
+UserCard consumes ThemeContext
+   ↓
+UserCard re-renders
+```
+
+Even though the `user` reference hasn't changed, `React.memo` can't prevent UserCard from updating because the Context value it consumes has changed.
+
+### Case 3: UserCard's Own Toggle
+
+```
+expanded updates
+   ↓
+UserCard's own state changes
+   ↓
+UserCard re-renders
+```
+
+This update comes from UserCard's own state and is unrelated to whether its parent's props have changed.
+
+### What If the User Reference Isn't Stable?
+
+Now suppose we move `user` inside App:
+
+```jsx
+function App() {
+  const [count, setCount] = useState(0)
+
+  const user = {
+    name: 'Joey'
+  }
+
+  // Everything else stays the same
+}
+```
+
+Every time App re-renders because `count` changes, it creates a new `user` object.
+
+```
+App re-renders
+   ↓
+A new user object is created
+   ↓
+user reference changes
+   ↓
+memo detects different props
+   ↓
+UserCard re-renders
+```
+
+Even though `user.name` hasn't changed, `React.memo` can no longer skip the render.
+
+This illustrates an important point: **whether memoization is effective depends not only on wrapping a component with `memo`, but also on the stability of its props' identities.**
+
+---
+
+## 10. Conclusion: When Should You Actually Optimize?
+
+Here's a summary of the most common situations:
+
+| Situation | Will the component re-render? | Can React.memo prevent it? |
+| --- | --- | --- |
+| Its own state changes | Usually; unchanged values may trigger a bailout | No, not for necessary state updates |
+| Its parent re-renders | Regular children re-render by default | Yes, if props are unchanged and no other updates are pending |
+| Its props change | The child usually needs to re-render | Generally no |
+| A Context it consumes changes | The consumer updates | Not through memo alone |
+| The DOM actually changes | Not necessarily | This is a separate reconciliation/commit concern |
+
+So the first question shouldn't be:
+
+> How do I prevent re-renders?
+
+A better question is:
+
+> **What actually triggered this render?**
+
+Was it the component's own state? A parent re-render? A Context update? Or did you expect `React.memo` to skip the render, only to find that an unstable object or function reference prevented the bailout?
+
+Once you can distinguish these update paths, React's rendering behavior becomes much easier to reason about.
+
+Ultimately, the goal isn't simply to reduce the number of component renders. It's to avoid unnecessary renders that have a meaningful performance cost without providing any real benefit. That's when `React.memo`, `useMemo`, and `useCallback` become genuinely useful.

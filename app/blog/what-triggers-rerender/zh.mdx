@@ -1,0 +1,724 @@
+{/* description: React component 重新 render，不只是因為 props 改變。本文從 State、Parent render 與 Context 三條更新路徑出發，解析 React.memo 的運作方式，以及物件與 function reference 如何影響 memoization，最後釐清什麼情況才真正需要優化。 */}
+
+# React re-render 到底是怎麼發生的？從 Props、State、Context 到 React.memo
+
+## TL;DR
+
+在 React 裡，component 重新 render 並不只有一個原因。自己的 state 更新、父元件重新 render，以及使用中的 Context 改變，都可能讓 component function 再次執行。
+
+其中最容易誤會的是 props：**props 沒有改變，不代表 Child 就不會 re-render。** 當 Parent 重新 render 時，React 預設會繼續處理它的子元件，即使 Child 收到的 props 與上次完全相同，仍可能再次執行。
+
+`React.memo` 的作用，就是在 props 沒有改變時，讓 React 可以跳過因 Parent 更新而產生的不必要 render。
+
+但 `memo` 無法阻止 component 自己的 state 更新，也無法阻止它所使用的 Context 更新。此外，如果傳入的物件或函式每次 render 都產生新的 reference，即使內容相同，也可能讓 `memo` 無法發揮效果。
+
+因此，理解 re-render 的重點不是讓所有 component 都盡量少 render，而是：
+
+> **先釐清這次 render 從哪裡來，再判斷它是否真的需要被優化。**
+
+---
+
+## 1. Props 沒變，為什麼 Child 還是 render？
+
+先看一個簡單的例子：
+
+```jsx
+import { useState } from 'react'
+
+function Child({ name }) {
+  console.log('Child render')
+  return <p>{name}</p>
+}
+
+function Parent() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(c => c + 1)}>
+        count: {count}
+      </button>
+
+      <Child name="Joey" />
+    </>
+  )
+}
+```
+
+每按一次按鈕，`count` 都會更新，Parent 因此重新 render。但同時，console 也會再次出現 `Child render`。
+
+奇怪的是，`<Child name="Joey" />` 從頭到尾都沒有改變。上一次的 `name` 是 `'Joey'`，這一次也一樣。
+
+**為什麼 Child 還需要重新 render？**
+
+問題出在一個很常見、卻不夠完整的理解：
+
+> Props 改變，所以 component re-render。
+
+這句話在一般情境下沒有錯，但如果反過來理解成：
+
+> Props 沒變，component 就不會 re-render。
+
+就不正確了。
+
+要理解原因，必須先釐清 React 所說的 render 究竟是什麼。
+
+---
+
+## 2. React render 不等於重新繪製畫面
+
+在上一篇 Browser Rendering 的文章裡，我們已經把 React render、DOM mutation 與 browser paint 區分成不同階段。
+
+這裡只需要先掌握一個核心觀念：
+
+> **React render 是重新計算 UI 的過程；對 Function Component 而言，通常會涉及重新執行 component function。**
+
+例如：
+
+```jsx
+function Child({ name }) {
+  console.log('Child render')
+  return <p>{name}</p>
+}
+```
+
+當 React 再次執行 `Child`，會取得新的 UI 描述，再判斷後續是否需要更新 DOM。
+
+但 component function 被執行，不代表 DOM 一定會被修改，更不代表瀏覽器一定會重新 paint。
+
+因此，接下來討論的 re-render，主要是在問：
+
+> 為什麼 React 又需要執行一次這個 component？
+
+而不是：
+
+> 為什麼瀏覽器又重新繪製畫面？
+
+這兩件事相關，但不能畫上等號。
+
+---
+
+## 3. State：最直接的 re-render 來源
+
+先從最容易理解的情況開始：
+
+```jsx
+function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <button onClick={() => setCount(c => c + 1)}>
+      {count}
+    </button>
+  )
+}
+```
+
+當 `setCount` 被呼叫時，React 會收到 state update，並安排這個 component 更新。
+
+流程可以簡化成：
+
+```
+setState
+   ↓
+React schedules update
+   ↓
+Component re-renders
+   ↓
+計算新的 UI
+```
+
+但這裡有個重要細節：**呼叫 state setter，不代表一定會產生有意義的更新。**
+
+例如：
+
+```js
+setCount(0)
+```
+
+如果目前的 `count` 已經是 `0`，React 可以利用 `Object.is` 比較新舊 state，跳過不必要的更新。在部分情況下，React 仍可能呼叫 component function，但會忽略這次 render 的結果。
+
+物件也是相同道理：
+
+```js
+setUser(user)
+```
+
+如果 `user` 仍然是原本的 reference，React 可能判定 state 沒有改變。因此，直接修改 state 物件，再將相同 reference 傳回 setter，可能無法得到預期的更新結果。這也是 React 強調 state 應該保持 immutable 的原因。
+
+簡單來說，**State 更新會讓 React 從持有該 state 的 component 開始處理更新，但相同值可能觸發 bailout。**
+
+---
+
+## 4. Parent render：Props 沒變也會重新執行？
+
+回到一開始的例子：
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(c => c + 1)}>
+        {count}
+      </button>
+
+      <Child name="Joey" />
+    </>
+  )
+}
+```
+
+當 `count` 改變：
+
+```
+count 更新
+   ↓
+Parent re-render
+   ↓
+重新計算 Parent 的 children
+   ↓
+Child 預設也會 re-render
+```
+
+React 執行 Parent 後，會產生新的 UI 描述，其中包含 `<Child name="Joey" />`。對一般沒有 memoization 的 Child 而言，React 預設會繼續執行它，即使這次收到的 props 與上次完全相同。
+
+因此，**Child 是否重新 render，並不是單純由 props 是否改變決定。**
+
+那麼，props 改變到底扮演什麼角色？
+
+```jsx
+function Parent() {
+  const [name, setName] = useState('Joey')
+
+  return <Child name={name} />
+}
+```
+
+假設 `name` 從 `'Joey'` 變成 `'Alex'`：
+
+```
+Parent state 更新
+   ↓
+Parent re-render
+   ↓
+產生新的 Child element 與 props
+   ↓
+Child re-render
+```
+
+實務上常簡化成 `Props changed → Child re-renders`，但更精確地說，props 本身並不是像 `setState` 一樣獨立觸發更新排程的機制。
+
+在這個例子裡，真正啟動更新的是 Parent 的 state。Parent 重新執行後，React 才進一步處理 Child。
+
+而且 React 不會預設替每個普通 component 都進行一次 props equality check，因為比較本身也有成本。對簡單的 component 而言，直接執行一次甚至可能更便宜。
+
+所以可以先建立這樣的理解：
+
+> Parent 重新 render 時，React 預設會繼續處理它的子元件；只有符合特定 bailout 條件時，才可能跳過部分 render 工作。
+
+這正是 `React.memo` 要解決的問題。
+
+---
+
+## 5. React.memo：如何跳過不必要的 render？
+
+把前面的 Child 改成：
+
+```jsx
+import { memo } from 'react'
+
+const Child = memo(function Child({ name }) {
+  console.log('Child render')
+  return <p>{name}</p>
+})
+```
+
+Parent 保持不變：
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(c => c + 1)}>
+        {count}
+      </button>
+
+      <Child name="Joey" />
+    </>
+  )
+}
+```
+
+現在按下按鈕，`count` 仍然會更新，Parent 也會重新 render。但 React 遇到 memoized Child 時，會比較前後兩次 props。
+
+```
+Parent re-render
+       ↓
+   React.memo
+       ↓
+   Props 相同？
+     /    \
+   是      否
+   ↓       ↓
+  skip   render
+```
+
+預設情況下，`React.memo` 使用 `Object.is` 逐一比較每個 prop。例如：
+
+```jsx
+<Child name="Joey" age={30} />
+```
+
+只要前後兩次的 `name` 與 `age` 都相同，而且沒有其他需要處理的更新，React 就可以跳過 Child 的重新執行。
+
+因此，`memo` 最主要的作用是：
+
+> **當 Parent 重新 render，但 Child 的 props 沒有改變時，避免不必要的 Child render。**
+
+不過，`React.memo` 是效能優化機制，而不是保證 component 永遠不會重新 render 的規則。
+
+---
+
+## 6. memo 擋不住 State 與 Context
+
+`React.memo` 主要處理 Parent 更新時的 props 比較，但 component 自己的 state，以及它使用中的 Context，仍然可以讓它重新 render。
+
+### 情況一：Child 自己的 State 改變
+
+```jsx
+const Child = memo(function Child({ name }) {
+  const [open, setOpen] = useState(false)
+
+  console.log('Child render')
+
+  return (
+    <>
+      <p>{name}</p>
+
+      <button onClick={() => setOpen(v => !v)}>
+        Toggle
+      </button>
+
+      {open && <div>Details</div>}
+    </>
+  )
+})
+```
+
+即使 Child 已經被 `memo` 包住，按下 Toggle 按鈕時：
+
+```
+Child state 更新
+   ↓
+Child re-render
+```
+
+這是正常且必要的行為，因為這次更新來自 Child 自己的 state，而不是單純因為 Parent 重新執行。
+
+### 情況二：使用中的 Context 改變
+
+假設有一個 `ThemeContext`：
+
+```jsx
+const ThemeContext = createContext('light')
+
+const Child = memo(function Child() {
+  const theme = useContext(ThemeContext)
+
+  console.log('Child render')
+
+  return <div className={theme}>Hello</div>
+})
+```
+
+App 提供 Context value：
+
+```jsx
+function App() {
+  const [theme, setTheme] = useState('light')
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      <button
+        onClick={() =>
+          setTheme(t =>
+            t === 'light' ? 'dark' : 'light'
+          )
+        }
+      >
+        Change theme
+      </button>
+
+      <Child />
+    </ThemeContext.Provider>
+  )
+}
+```
+
+即使 Child 沒有 props，而且已經使用 `memo`，只要 `ThemeContext` 的 value 改變，Child 仍然需要重新 render。
+
+```
+Context value 改變
+   ↓
+訂閱該 Context 的 Consumer 收到更新
+   ↓
+Child re-render
+```
+
+原因很直接：Child 雖然沒有收到新的 props，但它真正使用的資料 `theme` 已經改變。如果 React 因為 props 相同就跳過更新，畫面反而無法反映最新的 Context value。
+
+另外，React 使用 `Object.is` 比較 Context value。因此，如果 Provider 傳入的是每次 render 都重新建立的物件，即使內容相同，也可能觸發 Consumer 更新。
+
+到這裡，我們已經可以整理出三條主要的 re-render 路徑：
+
+```
+① Component 自己的 State 更新
+② Parent re-render
+③ Component 使用的 Context 更新
+```
+
+其中，`React.memo` 主要能避免的是第二條路徑中不必要的 render。
+
+---
+
+## 7. 物件與 Function 為什麼會影響 memo？
+
+現在進一步討論一個常見問題：明明已經使用 `React.memo`，為什麼 Child 還是一直 re-render？
+
+先看這個例子：
+
+```jsx
+const Child = memo(function Child({ config }) {
+  console.log('Child render')
+  return <div>{config.theme}</div>
+})
+
+function Parent() {
+  const [count, setCount] = useState(0)
+
+  const config = {
+    theme: 'dark'
+  }
+
+  return (
+    <>
+      <button onClick={() => setCount(c => c + 1)}>
+        {count}
+      </button>
+
+      <Child config={config} />
+    </>
+  )
+}
+```
+
+看起來 `config` 永遠都是 `{ theme: 'dark' }`，內容沒有改變，但每次 Parent render，Child 仍然會重新執行。
+
+原因不是 `React.memo` 壞掉，而是 JavaScript 比較物件的方式與原始型別不同。
+
+### 原始型別與 Reference 的比較
+
+對數字、字串等原始型別而言：
+
+```js
+1 === 1           // true
+'dark' === 'dark' // true
+```
+
+但對物件、陣列與函式而言，比較的是 reference：
+
+```js
+const a = { theme: 'dark' }
+const b = { theme: 'dark' }
+
+a === b // false
+
+const f = () => {}
+const g = () => {}
+
+f === g // false
+```
+
+以上例子使用 `===` 示範，對這些值而言，結果與 `Object.is` 相同。即使兩個物件內容完全相同，只要不是同一個 reference，就會被判定為不同。
+
+回到 Parent 的例子：
+
+```js
+const config = {
+  theme: 'dark'
+}
+```
+
+每次 Parent render，這段程式碼都會重新執行，產生新的物件。
+
+```
+第一次 render
+config → Object A
+
+第二次 render
+config → Object B
+
+Object A !== Object B
+```
+
+因此，`memo` 比較 props 時會發現：
+
+```
+previousConfig !== nextConfig
+   ↓
+Props 不同
+   ↓
+Child render
+```
+
+`memo` 並沒有失效，而是物件 reference 確實改變了。
+
+函式也是相同的情況：
+
+```jsx
+<Child onSave={() => save()} />
+```
+
+每次 Parent render，都會建立新的 arrow function。即使函式內容相同，前後兩次的 reference 仍然不同。
+
+### useMemo 與 useCallback
+
+這也是 `useMemo` 與 `useCallback` 可以發揮作用的情境。
+
+假設 `config` 不需要隨著 render 改變：
+
+```js
+const config = useMemo(() => ({
+  theme: 'dark'
+}), [])
+```
+
+如果 callback 依賴 `save`：
+
+```js
+const handleSave = useCallback(() => {
+  save()
+}, [save])
+```
+
+在 dependencies 沒有改變時，React 通常可以重用先前快取的值或函式 reference。兩者的差異是：
+
+* `useMemo`：快取計算結果。
+* `useCallback`：快取函式 reference。
+
+但 dependency array 必須包含計算或 callback 中使用的 reactive values，不能只是為了讓 reference 穩定就全部設成 `[]`。
+
+另外，memoization 本質上是效能優化，不應被視為永久保留 reference 的語意保證。
+
+---
+
+## 8. memo、useMemo、useCallback 值得使用嗎？
+
+理解這些工具後，很容易產生另一個想法：
+
+> 既然 reference 改變可能造成不必要的 render，那是不是所有物件都 useMemo，所有函式都 useCallback，所有 component 都 React.memo？
+
+通常沒有必要。原因主要有三個：
+
+1. **Memoization 本身有成本。** React 需要維護快取、比較 dependencies 或 props，這些工作同樣需要資源。
+2. **穩定 reference 不一定能減少 render。** 如果 Child 沒有使用 `memo`，單純讓 props reference 保持穩定，通常無法阻止它跟著 Parent 重新 render。
+3. **過度使用會增加程式碼複雜度。** 如果沒有實際效能問題，到處加入 memoization，可能反而降低可讀性。
+
+例如：
+
+```jsx
+function Child({ name }) {
+  return <span>{name}</span>
+}
+```
+
+對這種非常簡單的 component 而言，render 成本可能很低。即使改成：
+
+```jsx
+const Child = memo(function Child({ name }) {
+  return <span>{name}</span>
+})
+```
+
+也不代表一定會更快。因為我們其實是在用一次 props comparison 的成本，換取可能跳過一次 component render 的機會。如果 props 幾乎每次都改變，或 Child 本身非常簡單，效能提升可能相當有限。
+
+一般而言，`React.memo` 比較適合 Parent 經常重新 render、Child 的 render 成本較高，而且 props 大部分時間保持相同的情況。
+
+至於 `useMemo` 與 `useCallback`，除了搭配 memoized Child，也可以用來避免昂貴計算重複執行，或維持特定依賴關係中的 reference 穩定。
+
+另外，使用 React Compiler 的專案，也可能透過編譯器自動處理部分 memoization。
+
+因此，真正可靠的做法是：
+
+> **先找出效能瓶頸，再使用 React DevTools Profiler 等工具確認哪些 render 值得優化，而不是預設所有 component 都需要 memoization。**
+
+---
+
+## 9. 完整案例：辨識不同的 re-render 來源
+
+最後用一個例子，把前面的概念串在一起。這次刻意讓 `user` 保持穩定，避免物件 reference 干擾其他更新來源的觀察。
+
+```jsx
+import {
+  createContext,
+  memo,
+  useContext,
+  useState
+} from 'react'
+
+const ThemeContext = createContext('light')
+
+const user = {
+  name: 'Joey'
+}
+
+const UserCard = memo(function UserCard({ user }) {
+  const theme = useContext(ThemeContext)
+  const [expanded, setExpanded] = useState(false)
+
+  console.log('UserCard render')
+
+  return (
+    <div className={theme}>
+      <p>{user.name}</p>
+
+      <button onClick={() => setExpanded(v => !v)}>
+        Toggle
+      </button>
+
+      {expanded && <p>Details</p>}
+    </div>
+  )
+})
+
+function App() {
+  const [count, setCount] = useState(0)
+  const [theme, setTheme] = useState('light')
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      <button onClick={() => setCount(c => c + 1)}>
+        {count}
+      </button>
+
+      <button
+        onClick={() =>
+          setTheme(t =>
+            t === 'light' ? 'dark' : 'light'
+          )
+        }
+      >
+        Theme
+      </button>
+
+      <UserCard user={user} />
+    </ThemeContext.Provider>
+  )
+}
+```
+
+現在分別觀察三種情況。
+
+### 情況一：Count 改變
+
+```
+count 更新
+   ↓
+App re-render
+   ↓
+user reference 不變
+   ↓
+Context value 不變
+   ↓
+memo 可以跳過 UserCard render
+```
+
+因為 `user` 定義在 component 外部，不會隨著 App render 重新建立，因此 UserCard 收到的 props reference 沒有改變。
+
+### 情況二：Theme 改變
+
+```
+theme 更新
+   ↓
+Context value 改變
+   ↓
+UserCard 使用 ThemeContext
+   ↓
+UserCard re-render
+```
+
+即使 `user` reference 沒變，`React.memo` 仍然無法阻止 UserCard 更新，因為它讀取的 Context value 已經改變。
+
+### 情況三：UserCard 自己的 Toggle
+
+```
+expanded 更新
+   ↓
+UserCard 自己的 state 改變
+   ↓
+UserCard re-render
+```
+
+這次更新來自 UserCard 自己的 state，與 Parent 的 props 是否相同無關。
+
+### 如果 User Reference 不穩定呢？
+
+現在假設把 `user` 改成在 App 裡建立：
+
+```jsx
+function App() {
+  const [count, setCount] = useState(0)
+
+  const user = {
+    name: 'Joey'
+  }
+
+  // 其他程式碼保持不變
+}
+```
+
+每次 App 因 `count` 更新而重新 render，就會產生新的 `user` 物件。
+
+```
+App re-render
+   ↓
+重新建立 user
+   ↓
+user reference 改變
+   ↓
+memo 判斷 props 不同
+   ↓
+UserCard re-render
+```
+
+即使 `user.name` 完全沒有改變，`React.memo` 仍無法跳過這次 render。
+
+這個例子說明：**`memo` 是否能發揮效果，不只取決於 component 是否被包裝，也取決於 props 的 identity 是否穩定。**
+
+---
+
+## 10. 總結：什麼情況才需要優化？
+
+最後整理幾種常見情況：
+
+| 情況 | Component 會 re-render 嗎？ | React.memo 能擋嗎？ |
+| --- | --- | --- |
+| 自己的 State 改變 | 通常會；相同值可能 bailout | 不能阻止必要的 State 更新 |
+| Parent re-render | 普通 Child 預設會跟著 render | Props 相同且沒有其他更新時，可以跳過 |
+| Props 改變 | Child 通常需要重新 render | Props 不同時通常無法跳過 |
+| 使用中的 Context 改變 | Consumer 會更新 | 不能單靠 memo 阻止 |
+| DOM 是否真的改變 | 不一定 | 這是 reconciliation／commit 階段的另一個問題 |
+
+所以，「怎麼避免 re-render」其實不是第一個該問的問題。更重要的是：
+
+> **這一次 render 究竟從哪裡來？**
+
+是 component 自己的 State 更新？是 Parent 重新 render？是 Context value 改變？還是原本希望透過 `React.memo` 跳過更新，卻因為 object 或 function reference 不穩定，導致 bailout 條件沒有成立？
+
+只要能區分這些更新路徑，React 的 re-render 就不再是一件難以理解的事。
+
+而真正值得優化的，也從來不是單純讓 component 的 render 次數越少越好。我們要避免的，是那些成本明顯、卻沒有帶來實際價值的不必要 render。這也是 `React.memo`、`useMemo` 與 `useCallback` 真正應該發揮作用的地方。

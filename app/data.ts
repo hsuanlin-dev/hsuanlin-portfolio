@@ -271,15 +271,15 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     title: {
-      en: 'JavaScript Event Loop Explained: Understanding Microtasks and Macrotasks with a Stir-Fry Restaurant Analogy',
-      zh: '深入淺出 JavaScript Event Loop：熱炒店比喻，理解微任務與宏任務',
+      en: 'What Actually Triggers a React Re-render? From Props and State to Context and React.memo',
+      zh: 'React re-render 到底是怎麼發生的？從 Props、State、Context 到 React.memo',
     },
     description: {
-      en: 'Understand JavaScript Event Loop, microtasks, and macrotasks through a stir-fry restaurant analogy.',
-      zh: '用熱炒店比喻理解 JavaScript Event Loop、微任務與宏任務的執行順序。',
+      en: 'Explore the three paths that trigger a React re-render—state, parent renders, and Context—and how React.memo actually works.',
+      zh: '從 State、Parent render 到 Context，解析 React re-render 的三條路徑與 React.memo 的運作方式。',
     },
-    link: '/blog/javascript-event-loop-explained',
-    uid: 'blog-1',
+    link: '/blog/what-triggers-rerender',
+    uid: 'blog-what-triggers-rerender',
   },
   {
     title: {
@@ -292,6 +292,30 @@ export const BLOG_POSTS: BlogPost[] = [
     },
     link: '/blog/js-reference-and-copy',
     uid: 'blog-js-reference-and-copy',
+  },
+  {
+    title: {
+      en: 'JavaScript Event Loop Explained: Understanding Microtasks and Macrotasks with a Stir-Fry Restaurant Analogy',
+      zh: '深入淺出 JavaScript Event Loop：熱炒店比喻，理解微任務與宏任務',
+    },
+    description: {
+      en: 'Why the browser never freezes while waiting on a request, and how the call stack decides what runs first.',
+      zh: '為什麼瀏覽器不會因為等待請求而卡住？從 Call Stack 拆解程式碼的執行順序。',
+    },
+    link: '/blog/javascript-event-loop-explained',
+    uid: 'blog-1',
+  },
+  {
+    title: {
+      en: 'Debounce, Throttle, and Concurrency Control All Limit Flow, but They Guard Completely Different Lines',
+      zh: 'Debounce、Throttle 與併發控制都在限流，但守的不是同一條線',
+    },
+    description: {
+      en: 'Understand how debounce, throttle, and concurrency control each guard a different trigger source, and how the Event Loop lets them coexist on a single thread.',
+      zh: '理解 Debounce、Throttle 與併發控制各自守護的觸發來源有何不同，以及 Event Loop 如何讓三者在單執行緒中和平共存。',
+    },
+    link: '/blog/debounce-throttle-concurrency',
+    uid: 'blog-debounce-throttle-concurrency',
   },
   // {
   //   title: {
