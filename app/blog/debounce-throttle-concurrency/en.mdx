@@ -1,54 +1,161 @@
-# Debounce, Throttle, and Concurrency Control All Limit Flow, but They Guard Completely Different Lines
+# Debounce, Throttle, and Concurrency Control All Limit Work—but They Guard Different Boundaries
 
-## 1. TL;DR
+## TL;DR
 
-In the field of frontend performance optimization and resource scheduling, Debounce, Throttle, and Concurrency Control are often loosely lumped together as the same kind of "rate limiting" technique. However, in terms of design philosophy, these three tools each guard a completely different trigger source: **user input, screen rendering, and task quantity**.
+In frontend performance optimization and asynchronous task management, Debounce, Throttle, and Concurrency Control are often discussed together. While all three help prevent systems from performing too much work, they address fundamentally different problems:
 
-When building complex frontend applications (such as large grid systems or real-time monitoring dashboards), the cost of mixing up these tools usually isn't that the code fails to compile — it's that user experience or backend hardware resources can collapse without warning under specific extreme conditions. The underlying Event Loop is the ultimate answer to how these three strategies can coexist peacefully, without interfering with one another, in a single-threaded world.
+* **Debounce:** Waits until a sequence of events has paused before executing a function, avoiding unnecessary processing of intermediate states.
+* **Throttle:** Limits how frequently a function can execute within a given time interval, reducing the cost of handling high-frequency events.
+* **Concurrency Control:** Limits the number of asynchronous tasks running simultaneously to manage system resource usage.
+
+These strategies are not defined by event types. The right choice depends on what the application needs: whether only the final result matters, whether continuous feedback is required, or whether the number of concurrent operations needs to be controlled.
+
+JavaScript's Event Loop provides the foundation for understanding how timers, Promises, and asynchronous tasks are scheduled and executed.
 
 ---
 
-## 2. Core Concept Breakdown: Imagine a Drink Shop with Only One Clerk
+## 1. Core Concepts: Imagine a Drink Shop with One Clerk
 
-Before diving into browser internals, we can use a relatable "one-clerk drink shop" scenario to intuitively understand how these three concepts divide labor. The shop has only one clerk (the JavaScript single thread), who must face different kinds of traffic challenges:
+Before diving into browser internals, let's use a simple drink shop analogy to understand how these strategies differ.
+
+Imagine a shop with only one clerk responsible for processing orders. The clerk must handle several different types of workload.
 
 ### ① Debounce: "Wait Until You've Made Up Your Mind"
 
-A customer keeps changing their order on the kiosk: first boba, then pudding, then back to boba. The clerk doesn't send the order to the kitchen every time a button is pressed — instead, they wait until the customer "stops" for a while (say, 0.3 seconds with no further presses) before sending the final version of the order.
+A customer repeatedly changes an order at a self-service kiosk: first choosing tapioca pearls, then switching to pudding, and finally changing back to tapioca pearls.
 
-**Core idea**: a rapid sequence of "continuous edits" is collapsed into a single, final result.
+If the clerk immediately sends every modification to the kitchen, the shop ends up doing unnecessary work. Instead, the clerk decides to wait until the customer stops making changes for a certain period—say, 300ms—before submitting the final order.
 
-### ② Throttle: "Check Periodically, Not Every Single Time"
+```
+Customer modifies an order
+    │
+    ├── 0ms     Select tapioca pearls
+    │           └── Start a 300ms timer
+    │
+    ├── 100ms   Change to pudding
+    │           └── Cancel and restart the timer
+    │
+    ├── 200ms   Change back to tapioca pearls
+    │           └── Cancel and restart the timer
+    │
+    └── 500ms   No further changes
+                │
+                ▼
+          Submit final order ✓
 
-A customer in line keeps mashing the "refresh" button on the number-display machine to check the current queue number. If the screen redrew every single time, the clerk would go crazy. So the rule is: no matter how many times you press it, the screen only updates with the latest number once every second.
+Result: 3 modifications, 1 submission
+```
 
-**Core idea**: the events still happen at high frequency, but the system's response frequency is deliberately throttled — it's enough to periodically sample the latest state.
+**Core idea:** Consolidate a rapid sequence of events into a single execution after a period of inactivity.
 
-### ③ Concurrency Control: "There's a Lot to Do, but Only a Few Things Run at Once"
+### ② Throttle: "Handle It Periodically, Not Every Time"
 
-A delivery platform suddenly floods in 50 drink orders (the task count is already fixed), but the shop only has 4 shaker machines. The clerk absolutely cannot load all 50 cups into the machines at once (the hardware would instantly overload or break) — instead, 4 cups start shaking first, and whichever machine finishes first gets unloaded and immediately replaced with the next cup, always keeping exactly 4 cups running at a time.
+While waiting for a drink, a customer repeatedly presses the refresh button on the queue display.
 
-**Core idea**: the total number of tasks is already fixed; what's being managed is "the upper limit of concurrently running channels," which has nothing to do with how fast the user is acting.
+If every button press triggers another query and screen update, the system performs unnecessary work. Instead, the clerk limits refresh operations to at most once per second, regardless of how frequently the button is pressed.
 
-### ④ Event Loop: "There's Only One Clerk — How Do They Allocate Their Time?"
+```
+Customer repeatedly presses Refresh
 
-The clerk (the main thread) cannot do two things at once. But they keep a mental checklist they cycle through repeatedly: "Is the thing in my hands done? Has the timer gone off? Has the shaker machine popped up?" They always follow a fixed scheduling rule — finish the synchronous work at hand first, then give absolute priority to microtasks that cut in line (such as a completed Promise), and only then move on to the queued macrotasks (such as `setTimeout`).
+Time      Button Press    Actual Update
+───────────────────────────────────────
+0ms            ●               ✓
+200ms          ●               ✕
+400ms          ●               ✕
+600ms          ●               ✕
+800ms          ●               ✕
+1000ms         ●               ✓
+1200ms         ●               ✕
+1400ms         ●               ✕
+1600ms         ●               ✕
+1800ms         ●               ✕
+2000ms         ●               ✓
+───────────────────────────────────────
 
-**Core idea**: this isn't an optimization strategy — it's the underlying "physics engine" that actually makes the first three concepts run.
+Result: 11 presses, 3 actual updates
+        At least 1 second between updates
+```
+
+This reduces redundant work while still allowing the customer to receive updates throughout the waiting period.
+
+**Core idea:** Events may continue firing, but the function does not need to execute every time. Instead, its execution frequency is limited by a defined interval.
+
+### ③ Concurrency Control: "There's a Lot to Do, but Only a Few Tasks Can Run at Once"
+
+A delivery platform sends 50 drink orders to the shop at once, but the shop has only four drink-shaking machines.
+
+Rather than trying to process all 50 orders simultaneously, the clerk starts with four drinks. Whenever a machine finishes its current drink, it immediately takes the next order without waiting for the other machines to finish.
+
+```
+     50 drink orders arrive at once
+                  │
+                  ▼
+            Pending orders
+   [01][02][03][04][05] ... [50]
+                  │
+                  ▼
+        Maximum 4 active orders
+     ┌────────────────────────┐
+     │ Machine A: Order 01    │
+     │ Machine B: Order 02    │
+     │ Machine C: Order 03    │
+     │ Machine D: Order 04    │
+     └────────────────────────┘
+                  │
+                  ▼
+          Order 02 finishes ✓
+                  │
+                  ▼
+     Machine B takes the next order
+     ┌────────────────────────┐
+     │ Machine A: Order 01    │
+     │ Machine B: Order 05 ←  │
+     │ Machine C: Order 03    │
+     │ Machine D: Order 04    │
+     └────────────────────────┘
+                  │
+                  ▼
+   Continue processing and refilling
+                  │
+                  ▼
+          All orders processed
+
+Result: At most 4 drinks are being
+        prepared at the same time.
+        Each completed order frees
+        a slot for the next one.
+```
+
+**Core idea:** The goal is not to reduce the total number of tasks, but to limit how many can run simultaneously.
+
+### ④ Event Loop: "How Does the Clerk Manage Their Work?"
+
+The clerk can personally handle only one task at a time, but can delegate drink preparation to machines and return to other work while those machines operate.
+
+JavaScript's main thread behaves similarly. Synchronous code runs on the Call Stack, while asynchronous operations such as timers and network requests can be handled with mechanisms provided by the browser. When an asynchronous operation is ready to continue, its associated JavaScript work is scheduled according to the runtime's execution rules.
+
+**Core idea:** The Event Loop is not a rate-limiting strategy. It is an essential mechanism through which the JavaScript runtime coordinates tasks, microtasks, and other work.
+
+Keep in mind that the drink shop is only an analogy. A browser does not literally have just one unit of execution. Other browser mechanisms handle timers, networking, and certain background operations outside the JavaScript main thread.
 
 ---
 
-## 3. Real-World Scenario Translation: Swapping the Drink Shop for the Browser
+## 2. Real-World Applications: From the Drink Shop to the Browser
 
-When we map the above scenario onto a modern frontend architecture (such as a device-management dashboard), these three rate-limiting strategies each guard a different checkpoint:
+With the concepts established, let's apply these strategies to a real frontend application, such as a device-management dashboard.
 
-### ① Debounce Application: API Optimization for Search/Filter Boxes
+### ① Debounce: Search Input and Window Resizing
 
-When a user types a keyword into a global search box to find a specific piece of data-center equipment, listening directly to the `input` event and firing a request on every keystroke would put unnecessary instant pressure on the backend server. This is where debounce is needed — wait until the user has genuinely stopped typing before sending the final keyword.
+When a user enters a keyword into a search field, the `input` event fires with each change. Sending an API request on every keystroke can generate unnecessary intermediate queries, increasing network traffic and backend processing costs.
+
+For a search feature that only needs the final result, we generally do not need to process every partially entered keyword. Instead, we want to wait until the user briefly stops typing before searching with the latest input.
+
+This is exactly what Debounce does: each event resets the timer, and the function executes only after no new events have occurred for the specified delay.
 
 ```js
 function debounce(fn, delay) {
   let timer = null;
+
   return function (...args) {
     clearTimeout(timer);
     timer = setTimeout(() => fn.apply(this, args), delay);
@@ -56,23 +163,37 @@ function debounce(fn, delay) {
 }
 
 const handleSearch = debounce((keyword) => {
-  fetch(`/api/devices?q=${keyword}`).then(renderDeviceList);
+  fetch(`/api/devices?q=${encodeURIComponent(keyword)}`)
+    .then((response) => response.json())
+    .then(renderDeviceList);
 }, 300);
 
-searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
+searchInput.addEventListener('input', (e) => {
+  handleSearch(e.target.value);
+});
 ```
 
-**🚨 Cost of misuse**: Using Throttle here instead won't crash the system, but it will cause serious bandwidth waste. While the user is still typing continuously, the system will keep force-firing "intermediate state" search requests at fixed time intervals — and these incomplete requests are doomed to be wasted the moment they're sent, because by the time the response comes back, the keyword in the input box has already changed.
+Another common application is `window.resize`. For example, suppose a complex chart needs to recalculate its coordinates based on the browser window's dimensions. If the chart does not need continuous recalculation during resizing, Debounce can delay the expensive operation until the user stops resizing. For ordinary responsive layouts, CSS should generally be the preferred solution.
 
-### ② Throttle Application: Widget Resizing and Real-Time Drag Rendering
+**Common misuse:** Replacing Debounce with Throttle in scenarios that only require the final result may cause unnecessary intermediate queries or calculations while the user is still typing or resizing.
 
-When a user drags or zooms a topology canvas, the `mousemove` event can fire dozens of times per second. If every single trigger caused React to recompute a large number of node coordinates and repaint the DOM, the page would immediately start dropping frames and lagging.
+This does not mean Throttle can never be used for search inputs or window resizing. It simply means that when the application only needs the result after the interaction stops, Debounce is usually the more direct and efficient choice.
+
+### ② Throttle: Dragging, Scrolling, and Real-Time UI Updates
+
+When users drag nodes on a topology diagram or scroll through a page, events such as `mousemove` and `scroll` may fire repeatedly within a short period. If every event triggers complex coordinate calculations or expensive UI updates, the application may perform unnecessary work and lose responsiveness.
+
+However, these interactions differ from the previous search example in one important way: users need continuous visual feedback while the interaction is happening, rather than seeing the result only after it ends.
+
+Throttle can help by limiting execution frequency, reducing redundant calculations while preserving ongoing feedback.
 
 ```js
 function throttle(fn, interval) {
   let last = 0;
+
   return function (...args) {
     const now = Date.now();
+
     if (now - last >= interval) {
       last = now;
       fn.apply(this, args);
@@ -84,101 +205,222 @@ const handleDrag = throttle((x, y) => {
   renderTopology(x, y);
 }, 100);
 
-topologyCanvas.addEventListener('mousemove', (e) => handleDrag(e.clientX, e.clientY));
+topologyCanvas.addEventListener('mousemove', (e) => {
+  handleDrag(e.clientX, e.clientY);
+});
 ```
 
-**🚨 Cost of misuse**: Swapping in Debounce where Throttle should be used is usually a UI interaction disaster. On every single `mousemove` trigger, Debounce clears the previous timer and re-queues it. As long as the user's mouse is still moving, the timer never gets a chance to finish counting down, which means the render function never gets called at all until the drag ends and the mouse is released. The felt experience is that "the screen freezes completely during the drag, and only suddenly jumps the instant you let go" — an eerie, frozen-feeling glitch.
+This example limits execution to at most once every 100ms. Its purpose is to demonstrate time-based throttling, not to provide a complete drag-and-drop implementation.
 
-### ③ Concurrency Control Application: Batch Operations Triggering a Large Number of Fetches
+This simplified approach skips events that occur within the restricted interval and does not guarantee that the final pointer position will be rendered. For smoother dragging or animations, `requestAnimationFrame` is often preferable because it aligns visual updates with the browser's rendering cycle.
 
-When a user selects 50 devices in a list and clicks "batch restart," or when a complex page loads and 10 independent widget components each fire their own API call to fetch data at once, sending everything at once with `Promise.all` will immediately run into the browser's same-origin connection limit (typically capped at 6 under HTTP/1.1), and can even overwhelm the backend's processing capacity. At this point, concurrency control (a worker pool) must be introduced, sending tasks out in capped batches so that all tasks eventually complete while protecting the system's channels.
+**Common misuse:** Using Debounce for an interaction that requires continuous visual feedback can delay updates until the user stops moving. The result may feel like the interface has frozen during dragging, only to jump to its final position afterward.
+
+The choice depends on the interaction requirements, not the event name: **when only the final result matters, consider Debounce; when the application must continue responding during the interaction, consider Throttle.**
+
+![Debounce vs Throttle: Debounce resets its timer on every input and runs one search after 300ms of inactivity; Throttle keeps responding during continuous events, running at most once per second and skipping calls within the interval](/blog/debounce-throttle-concurrency/debounce-throttle-en.svg)
+
+### ③ Concurrency Control: Batch Operations and Worker Pools
+
+Suppose a user selects 50 devices in a device-management dashboard and clicks "Batch Restart." The application now needs to send 50 independent API requests.
+
+If all requests are started at once and grouped using `Promise.all()`, they may place significant load on the backend within a short period.
+
+Concurrency Control allows us to limit how many requests are active simultaneously. For example, with a concurrency limit of four, the system starts four tasks. Whenever one finishes successfully, the next pending task can begin.
+
+This matches the drink shop analogy: the 50 drinks represent 50 tasks, and the four shaking machines represent four Workers. Each machine takes another order after finishing its current one, without waiting for the other machines. This approach is commonly called a **Worker Pool**.
 
 ```js
-// A robust async concurrency control implementation
 async function runWithLimit(tasks, limit) {
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new RangeError('limit must be a positive integer');
+  }
+
   let index = 0;
 
   async function worker() {
     while (index < tasks.length) {
       const current = index++;
-      // Wait for the current task to finish (scheduled via the microtask queue), then refill with the next one
       await tasks[current]();
     }
   }
 
-  // Create the specified number of parallel worker lanes (Worker Pool)
-  await Promise.all(Array.from({ length: limit }, worker));
-}
+  const workers = Array.from(
+    { length: Math.min(limit, tasks.length) },
+    () => worker()
+  );
 
-// In practice: batch-restart 50 devices
-const tasks = selectedDevices.map((id) => () => fetch(`/api/device/${id}/restart`));
-runWithLimit(tasks, 4); // Never more than 4 requests in flight at once
+  await Promise.all(workers);
+}
 ```
 
-**🚨 Fatal mistake: replacing async concurrency control with Throttle**
-
-This is a very subtle and serious logic error. Misusing the tool in this scenario doesn't just slow things down a little — it causes core data to be silently lost, with the system reporting no errors at all. The two tools have completely opposite design philosophies:
-
-* **Throttle is allowed to drop work (time-based)**: when a user drags the topology canvas, missing a few `mousemove` coordinate samples costs nothing, because the next sample arrives very soon. Its philosophy is: "I only need the latest state — whatever gets dropped in between doesn't matter."
-* **Concurrency control must never drop work (capacity-based)**: the initialization data for each of the 10 widgets, the restart commands for each of the 50 devices — every single one is an independent, indispensable core task that must safely arrive. Its philosophy is: "Every task must succeed — I'm only limiting how many happen at the same time."
+Example usage:
 
 ```js
-// Anti-pattern: trying to rate-limit widget loading requests with Throttle
-const throttledFetch = throttle((widgetId) => {
-  fetch(`/api/widget/${widgetId}`).then(renderWidget);
-}, 100);
+const tasks = selectedDevices.map((id) => {
+  return async () => {
+    const response = await fetch(
+      `/api/device/${id}/restart`,
+      { method: 'POST' }
+    );
 
-// 10 independent components call throttledFetch almost simultaneously on page init
-widgets.forEach((w) => throttledFetch(w.id));
+    if (!response.ok) {
+      throw new Error(`Failed to restart device ${id}`);
+    }
+  };
+});
+
+await runWithLimit(tasks, 4);
 ```
 
-These 10 calls happen almost within the same event loop tick. Because Throttle's gating logic only looks at the time difference, once the first widget's request gets through, the remaining 9 requests all fail to satisfy the interval condition — and the throttle function discards them outright, rather than deferring them to run later.
+The important detail is that `tasks` contains functions that have not started executing, rather than Promises that are already running.
 
-The result on the UI is: after the page loads, only the first card successfully shows data, while the remaining 9 cards stay stuck spinning in a loading state forever. Neither the browser console nor the Network tab shows any error at all — developers have to spend hours debugging through the night before realizing those requests were never sent out in the first place.
+`runWithLimit()` creates up to four Workers. Each Worker waits for its current task using `await`, then returns to the `while` loop to pick up the next pending task.
 
-### Engineering Trade-offs and Parameter Configuration
+As long as tasks complete successfully, Workers keep taking new tasks while ensuring that no more than four are active at the same time.
 
-When implementing concurrency control, the `limit` parameter isn't simply "the higher the better" — configuring it correctly heavily tests an engineer's judgment about system resource trade-offs:
+In this example, a Worker is simply an async function that manages asynchronous tasks. It is not a browser Web Worker, nor does it create a separate JavaScript thread.
 
-* **Set too low (e.g. `limit: 1`)**: ten widgets line up in a long queue, causing head-of-line blocking — users clearly feel severe stalling as page sections load piece by piece.
-* **Set too high (e.g. `limit: 50`)**: this defense line becomes purely symbolic — the sudden flood of connections directly hits the browser's physical limits or overwhelms backend hardware capacity, and tasks eventually start timing out and failing one after another.
+**Common Misuse: Treating Throttle as Concurrency Control**
+
+Throttle controls how frequently a function executes. It does not limit the number of asynchronous tasks running simultaneously. Consider this incorrect implementation:
+
+```js
+const throttledFetch = throttle((widgetId) => {
+  fetch(`/api/widget/${widgetId}`)
+    .then((response) => response.json())
+    .then(renderWidget);
+}, 100);
+
+widgets.forEach((widget) => {
+  throttledFetch(widget.id);
+});
+```
+
+Suppose 10 widgets call the same `throttledFetch()` function almost simultaneously. With the simple Throttle implementation shown earlier, the first eligible call executes, while subsequent calls within the restricted interval may be skipped entirely.
+
+Instead of loading all 10 widgets in sequence, some widgets may never send their requests at all, potentially leaving them without data or stuck in a loading state.
+
+Even a Throttle implementation that delays calls cannot guarantee a limit on simultaneous requests. The previous request may still be running when the next one begins.
+
+> **The key difference: Throttle limits execution frequency; Concurrency Control limits the number of tasks running simultaneously.**
+
+**Engineering Trade-offs: A Higher Concurrency Limit Is Not Always Better**
+
+The concurrency limit affects both overall completion time and resource usage.
+
+If the limit is too low, such as `limit: 1`, tasks execute sequentially, potentially increasing the total processing time. If the limit is too high, such as `limit: 50`, a large number of requests may reach the backend simultaneously, increasing server load and potentially triggering rate limits or timeouts.
+
+The appropriate limit depends on backend capacity, network conditions, and application requirements.
+
+It is also important to understand that concurrency control does not guarantee task success.
+
+The Worker Pool above is a simplified example. If a task fails, its Worker stops and the outer `Promise.all()` rejects. Other Workers that have already started are not automatically canceled.
+
+Production batch operations generally require additional error handling, retry strategies, and result aggregation to ensure that each task has a clearly defined outcome.
 
 ---
 
-## 4. Three Lines, One Engine
+## 3. Three Boundaries, One Execution Environment
 
-Debounce guards user input, Throttle guards screen rendering, and Concurrency Control guards task quantity — three independent defense lines, none subordinate to the others. However, no matter how perfectly we write these defense strategies on the frontend, they ultimately all come back to the same underlying core: the JavaScript Runtime engine. The architecture diagram below makes it intuitively clear how these three defense lines actually operate underneath:
+Although the three strategies solve different problems, they all interact with the JavaScript runtime when they involve timers, Promises, or asynchronous operations. Understanding how the runtime schedules work helps explain why these strategies behave the way they do.
 
-![JavaScript Runtime — under-the-hood flow of rate limiting strategies, showing the relationship between the Call Stack, Web APIs, Microtask Queue, Macrotask Queue, and Event Loop](/blog/debounce-throttle-concurrency/runtime-diagram-en.svg)
+### Event Loop: Synchronous Work, Tasks, and Microtasks
 
-### Dual-Track Scheduling: Where Macrotasks and Microtasks Converge
+In the browser's main thread, synchronous JavaScript code executes on the Call Stack.
 
-Debounce, Throttle, and Concurrency Control all live inside the same JS main thread (the Call Stack). The reason they can coexist peacefully without tangling each other up is that the browser APIs they rely on quietly route into two different scheduling tracks underneath:
+When JavaScript encounters `setTimeout()`, the browser schedules a timer. When it encounters `fetch()`, the network request can proceed asynchronously through the browser's networking mechanisms.
 
-* **Debounce and Throttle take the "macrotask" path.** Both rely on `setTimeout` at their core. Once the browser's Web APIs finish timing, the completed callback is, by spec, pushed into the macrotask queue to wait its turn.
-* **Concurrency Control takes the "microtask" path.** It manages network requests (such as `fetch`) and relies on Promise (or `await`) to sense when a task finishes. The instant an async request resolves, its corresponding callback goes directly into the higher-priority microtask queue.
+These operations do not require JavaScript to remain blocked while waiting for them. Once their respective conditions are met, subsequent work is scheduled according to the runtime's execution rules.
 
-### The Hidden Mechanism: Concurrency Control's Scheduling Illusion
+Two important concepts are involved:
 
-This reveals the part of concurrency control that's most easily misunderstood. On the surface, it looks clever — as if it schedules itself, automatically refilling a slot the moment one finishes. But once you trace the dashed red loop running across the entire runtime in the architecture diagram (the "concurrency dispatch loop"), you'll see: **concurrency control only defines the "refill rule" — it has no control whatsoever over the "exact moment the refill happens."**
+**Task (commonly called a Macrotask)**
 
-The moment the code fires off `fetch` and pauses at that `await` line, control of the main thread is handed over to the Web APIs. The task must wait for the network request to complete, for its callback to queue up in the microtask queue, and finally for the underlying Event Loop to detect that the stack is empty and pull the callback back onto the Call Stack — only at that exact instant does the next task's refill actually get triggered. In other words, that large red loop is the real hidden mechanism behind concurrency control's "illusion of self-scheduling."
+Examples include timer callbacks and certain user interaction events.
+
+`setTimeout(fn, 300)` does not guarantee that `fn` will execute exactly 300ms later. The timer must first become eligible, after which the callback waits until the main thread can execute the corresponding task.
+
+**Microtask**
+
+Promise callbacks such as `.then()`, `.catch()`, and `.finally()`, as well as the continuation of an asynchronous function after `await`, are scheduled as Microtasks.
+
+Generally, after the current JavaScript work completes, the browser performs a Microtask checkpoint and processes the queued Microtasks before proceeding with subsequent work.
+
+However, browser scheduling involves more than just Tasks and Microtasks. Rendering and `requestAnimationFrame` have their own execution timing.
+
+### How Do Debounce and Throttle Use These Mechanisms?
+
+A typical Debounce implementation uses `setTimeout()` to schedule delayed execution and `clearTimeout()` to cancel a previously scheduled timer. Each new event resets the countdown. The callback becomes eligible to execute only after events stop arriving for the specified delay.
+
+Throttle can be implemented in different ways. For example, the simplified implementation earlier uses `Date.now()` to compare timestamps and executes the function immediately when the interval condition is satisfied. It does not create a new timer. Other implementations may use `setTimeout()` to schedule delayed execution.
+
+Therefore, **Debounce and Throttle are control strategies, not scheduling categories built into the Event Loop.** Whether they involve the Task Queue depends on their implementation.
+
+### How Does Concurrency Control Automatically Refill Available Slots?
+
+Recall the Worker Pool example:
+
+```js
+async function worker() {
+  while (index < tasks.length) {
+    const current = index++;
+    await tasks[current]();
+  }
+}
+```
+
+When a Worker reaches `await`, the asynchronous function suspends its remaining execution if the Promise is still pending. It does not continuously occupy the JavaScript Call Stack while waiting.
+
+Once the Promise settles, the continuation after `await` is scheduled as a Microtask. When the Worker resumes, it continues the `while` loop and retrieves the next task. This is how a Worker Pool can automatically refill an available slot after a task completes.
+
+However, two responsibilities must be distinguished:
+
+* **Worker Pool:** The application code defines the refill rules and the maximum number of concurrently active tasks.
+* **JavaScript Runtime:** The execution environment schedules the continuation of JavaScript code after asynchronous operations complete.
+
+In other words, the Event Loop does not independently decide which task should run next. Automatic refilling results from the Worker Pool's logic working together with Promises and JavaScript scheduling.
+
+### Understanding the Three Strategies from an Architectural Perspective
+
+![JavaScript Runtime — rate limiting and async scheduling, showing the relationship between the Call Stack, Web APIs, Microtask Queue, Task Queue, and Event Loop](/blog/debounce-throttle-concurrency/runtime-diagram-en.svg)
+
+The diagram illustrates how the three control strategies interact with the JavaScript execution environment.
+
+Debounce can use timers to schedule delayed execution. Throttle can determine whether to execute a function by comparing timestamps. Concurrency Control uses Promises and async/await to manage asynchronous task completion and slot refilling.
+
+Although these strategies rely on JavaScript's execution mechanisms, they are not three separate scheduling channels built into the browser.
 
 ---
 
-## 5. Summary and Structural Comparison
+## 4. Summary and Structural Comparison
 
-| Concept | What it manages | Trigger source | What it protects | Where it runs |
-| --- | --- | --- | --- | --- |
-| Debounce | Collapses into "the last call" | User input (uncontrollable frequency) | Avoids unnecessary duplicate requests | Browser JS main thread |
-| Throttle | Downsamples to "once periodically" | High-frequency events (uncontrollable frequency) | Rendering performance | Browser JS main thread |
-| Concurrency Control | Caps "how many at once" | Task count is already fixed, fires once | Browser connection limits / backend server resources | Browser JS main thread |
-| Event Loop | Schedules "who goes first" | Everything depends on it to run at all | — | JS engine internals |
+| Concept | What It Controls | Main Purpose | Common Applications |
+| --- | --- | --- | --- |
+| Debounce | Execution after a period of inactivity | Avoid processing unnecessary intermediate states | Search input, recalculation after resizing |
+| Throttle | Execution frequency within a time interval | Reduce the cost of high-frequency events | Dragging, scrolling, continuous updates |
+| Concurrency Control | Number of simultaneously active tasks | Manage resource usage and system load | Batch APIs, file uploads |
+| Event Loop | Scheduling of JavaScript work | Coordinate synchronous and asynchronous execution | Timers, Promises, event handling |
+
+These concepts can also be expressed as practical engineering questions:
+
+* **Debounce:** Is the user still interacting? Can processing wait until the interaction pauses?
+* **Throttle:** Are events firing too frequently? Does the application need continuous feedback without handling every event?
+* **Concurrency Control:** Do all these tasks need to be processed? How many can the system handle simultaneously?
+* **Event Loop:** How and when does scheduled JavaScript work get an opportunity to execute?
+
+These questions operate at different levels and cannot simply replace one another.
 
 ---
 
-## 6. Conclusion
+## 5. Conclusion
 
-On the front line, Debounce, Throttle, and Concurrency Control are our "tactical strategies" — they decide whether a task runs, when it runs, and how many run at once. Behind the scenes, the Event Loop is the only "physics engine." Without it spinning underneath, the timers and Promises of the first three would just be dead code sitting in memory, never executed.
+Debounce, Throttle, and Concurrency Control can all reduce unnecessary work or manage system load, but they are not interchangeable techniques.
 
-When building complex frontend systems, seeing clearly which line each of these defends is far more important than memorizing any polyfill's implementation. The three lines were never the same line from start to finish — but what truly makes them run, what makes the application work elegantly, has always been, from start to finish, the same single engine.
+Debounce determines when a sequence of events should trigger execution. Throttle limits how frequently a function can run. Concurrency Control determines how many tasks may remain active simultaneously.
+
+The Event Loop is not a fourth rate-limiting strategy. Instead, it provides the scheduling foundation needed to understand how these control strategies interact with JavaScript's asynchronous execution model.
+
+What matters most is not memorizing which technique belongs to which event, but identifying the level at which a problem occurs and choosing the appropriate control strategy.
+
+Understanding these distinctions allows us to make better engineering trade-offs between responsiveness, rendering performance, and resource efficiency.
